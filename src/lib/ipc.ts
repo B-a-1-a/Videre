@@ -65,6 +65,14 @@ export async function timelineApplyPatch(projectId: string, patch: TimelinePatch
   });
 }
 
+export async function timelineGetJson(projectId: string): Promise<string | null> {
+  return invoke<string | null>("timeline_get_json", { projectId });
+}
+
+export async function timelineSaveJson(projectId: string, json: string): Promise<void> {
+  return invoke<void>("timeline_save_json", { projectId, json });
+}
+
 export async function renderStart(projectId: string, settings: RenderSettingsDto): Promise<RenderJobDto> {
   return invoke<RenderJobDto>("render_start", { projectId, settings });
 }

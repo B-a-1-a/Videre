@@ -13,8 +13,6 @@ use crate::{
     },
 };
 
-pub const SCHEMA_VERSION: i64 = 1;
-
 pub fn now_iso() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
 }
@@ -40,18 +38,31 @@ pub fn open_connection(db_path: &Path) -> AppResult<Connection> {
 }
 
 pub fn run_migrations(conn: &Connection) -> AppResult<()> {
+    // Migration 1: initial schema (all statements use IF NOT EXISTS, safe to re-run)
     conn.execute_batch(include_str!("migrations/0001_init.sql"))?;
-
-    let already_applied: i64 = conn.query_row(
+    let v1_applied: i64 = conn.query_row(
         "SELECT COUNT(1) FROM schema_migrations WHERE version = ?1",
-        params![SCHEMA_VERSION],
+        params![1_i64],
         |row| row.get(0),
     )?;
-
-    if already_applied == 0 {
+    if v1_applied == 0 {
         conn.execute(
             "INSERT INTO schema_migrations (version, applied_at) VALUES (?1, ?2)",
-            params![SCHEMA_VERSION, now_iso()],
+            params![1_i64, now_iso()],
+        )?;
+    }
+
+    // Migration 2: add timeline_json column to projects table
+    let v2_applied: i64 = conn.query_row(
+        "SELECT COUNT(1) FROM schema_migrations WHERE version = ?1",
+        params![2_i64],
+        |row| row.get(0),
+    )?;
+    if v2_applied == 0 {
+        conn.execute_batch(include_str!("migrations/0002_timeline_json.sql"))?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (?1, ?2)",
+            params![2_i64, now_iso()],
         )?;
     }
 

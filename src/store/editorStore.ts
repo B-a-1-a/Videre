@@ -21,6 +21,8 @@ import {
   renderStatus,
   timelineApplyPatch,
   timelineGet,
+  timelineGetJson,
+  timelineSaveJson,
 } from "../lib/ipc";
 
 type EditorState = {
@@ -37,6 +39,13 @@ type EditorState = {
   statusMessage?: string;
   errorMessage?: string;
   importProgressByAssetId: Record<string, number>;
+  twickTimelineJson: string | null;
+  twickAddElement: ((element: unknown) => Promise<void>) | null;
+  setTwickAddElement: (fn: ((element: unknown) => Promise<void>) | null) => void;
+  twickGetTimelineData: (() => unknown) | null;
+  setTwickGetTimelineData: (fn: (() => unknown) | null) => void;
+  loadTwickTimeline: (projectId: string) => Promise<void>;
+  saveTwickTimeline: (projectId: string, json: string) => Promise<void>;
   loadRecentProjects: () => Promise<void>;
   createProject: (name: string, location: string) => Promise<void>;
   openProject: (projectRoot: string) => Promise<void>;
@@ -89,6 +98,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   zoomPxPerSec: 100,
   loading: false,
   importProgressByAssetId: {},
+  twickTimelineJson: null,
+  twickAddElement: null,
+  setTwickAddElement: (fn) => set({ twickAddElement: fn }),
+  twickGetTimelineData: null,
+  setTwickGetTimelineData: (fn) => set({ twickGetTimelineData: fn }),
+
+  loadTwickTimeline: async (projectId: string) => {
+    try {
+      const twickTimelineJson = await timelineGetJson(projectId);
+      set({ twickTimelineJson });
+    } catch {
+      // non-fatal: twick timeline may not exist yet for older projects
+    }
+  },
+
+  saveTwickTimeline: async (projectId: string, json: string) => {
+    try {
+      await timelineSaveJson(projectId, json);
+      set({ twickTimelineJson: json });
+    } catch (error) {
+      set({ errorMessage: normalizeError(error) });
+    }
+  },
 
   loadRecentProjects: async () => {
     try {
@@ -119,6 +151,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     try {
       const snapshot = await projectOpen(projectRoot);
       setSnapshot(snapshot);
+      await get().loadTwickTimeline(snapshot.summary.id);
       await get().loadRecentProjects();
       set({ statusMessage: `Opened project '${snapshot.summary.name}'.` });
     } catch (error) {
@@ -281,6 +314,7 @@ function setSnapshot(snapshot: ProjectSnapshot) {
     errorMessage: undefined,
     renderJob: undefined,
     importProgressByAssetId: {},
+    twickTimelineJson: null,
   });
 }
 

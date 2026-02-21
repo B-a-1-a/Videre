@@ -9,7 +9,7 @@ import {
 } from "./lib/ipc";
 import { ProjectPanel } from "./features/projects/ProjectPanel";
 import { MediaBin } from "./features/media-bin/MediaBin";
-import { TimelineEditor } from "./features/timeline/TimelineEditor";
+import { TwickEditor } from "./features/timeline/TwickEditor";
 import { RenderPanel } from "./features/export/RenderPanel";
 import { useEditorStore } from "./store/editorStore";
 import "./App.css";
@@ -115,7 +115,7 @@ function App() {
         </aside>
 
         <section className="main-content">
-          <TimelineEditor />
+          <TwickEditor />
         </section>
       </div>
     </main>

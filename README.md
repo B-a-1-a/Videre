@@ -111,6 +111,14 @@ A GitHub Actions workflow is included at `.github/workflows/ci.yml` for:
 - Cargo + npm audits
 - macOS and Windows matrix runs
 
+## Standalone Nexa Caption Lab
+
+For isolated Python-based ASR captioning experiments (no Tauri integration), use:
+
+- `/Users/bala/Repos/Videre/nexa-caption-lab`
+
+See `/Users/bala/Repos/Videre/nexa-caption-lab/README.md` for setup and CLI usage.
+
 ## Security notes
 
 - Path handling is constrained to opened project roots.

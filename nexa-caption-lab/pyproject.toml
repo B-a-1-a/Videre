@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nexa-caption-lab"
+version = "0.1.0"
+description = "Standalone Nexa SDK video captioning playground."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["nexaai"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+nexa-caption = "nexa_caption_lab.caption_video:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

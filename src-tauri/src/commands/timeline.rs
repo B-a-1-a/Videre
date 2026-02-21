@@ -8,6 +8,41 @@ use crate::{
 };
 
 #[tauri::command]
+pub fn timeline_get_json(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    project_id: String,
+) -> AppResult<Option<String>> {
+    let root = super::project::resolve_project_root(&app, &state, &project_id)?;
+    let conn = open_connection(&project_db_path(&root))?;
+    let result = conn.query_row(
+        "SELECT timeline_json FROM projects WHERE id = ?1",
+        params![&project_id],
+        |row| row.get::<_, Option<String>>(0),
+    );
+    match result {
+        Ok(json) => Ok(json),
+        Err(_) => Ok(None),
+    }
+}
+
+#[tauri::command]
+pub fn timeline_save_json(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    project_id: String,
+    json: String,
+) -> AppResult<()> {
+    let root = super::project::resolve_project_root(&app, &state, &project_id)?;
+    let conn = open_connection(&project_db_path(&root))?;
+    conn.execute(
+        "UPDATE projects SET timeline_json = ?1, updated_at = ?2 WHERE id = ?3",
+        params![json, now_iso(), &project_id],
+    )?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn timeline_get(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,

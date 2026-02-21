@@ -26,6 +26,8 @@ pub fn run() {
             commands::media::media_remove,
             commands::timeline::timeline_get,
             commands::timeline::timeline_apply_patch,
+            commands::timeline::timeline_get_json,
+            commands::timeline::timeline_save_json,
             commands::render::render_start,
             commands::render::render_status,
             commands::render::render_cancel,

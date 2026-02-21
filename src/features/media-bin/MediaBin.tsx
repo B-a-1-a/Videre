@@ -1,17 +1,18 @@
 import { open } from "@tauri-apps/plugin-dialog";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { VideoElement, AudioElement, ImageElement } from "@twick/timeline";
 import { useEditorStore } from "../../store/editorStore";
+
+const VIDEO_RESOLUTION = { width: 1920, height: 1080 };
 
 export function MediaBin() {
   const currentProject = useEditorStore((state) => state.currentProject);
   const assets = useEditorStore((state) => state.assets);
-  const timeline = useEditorStore((state) => state.timeline);
-  const playheadMs = useEditorStore((state) => state.playheadMs);
-  const selectedTrackId = useEditorStore((state) => state.selectedTrackId);
   const importProgressByAssetId = useEditorStore((state) => state.importProgressByAssetId);
+  const twickAddElement = useEditorStore((state) => state.twickAddElement);
 
   const importMedia = useEditorStore((state) => state.importMedia);
   const removeAsset = useEditorStore((state) => state.removeAsset);
-  const addClipFromAsset = useEditorStore((state) => state.addClipFromAsset);
 
   async function handleImport() {
     const filePaths = await open({
@@ -26,17 +27,27 @@ export function MediaBin() {
   }
 
   async function handleAddToTimeline(assetId: string, assetKind: string) {
-    if (!timeline) return;
+    if (!twickAddElement) return;
 
-    const fallbackTrack =
-      timeline.tracks.find((track) =>
-        assetKind === "audio" ? track.kind === "audio" : track.kind === "video",
-      ) ?? timeline.tracks[0];
+    const asset = assets.find((a) => a.id === assetId);
+    if (!asset) return;
 
-    const trackId = selectedTrackId ?? fallbackTrack?.id;
-    if (!trackId) return;
+    // Prefer proxy (lower bitrate) for preview, fall back to original
+    const sourcePath = asset.proxyPath ?? asset.managedPath;
+    const url = convertFileSrc(sourcePath);
 
-    await addClipFromAsset(assetId, trackId, playheadMs);
+    let element: VideoElement | AudioElement | ImageElement;
+    if (assetKind === "video") {
+      element = new VideoElement(url, VIDEO_RESOLUTION);
+      if (asset.durationMs) element.setMediaDuration(asset.durationMs / 1000);
+    } else if (assetKind === "audio") {
+      element = new AudioElement(url);
+      if (asset.durationMs) element.setMediaDuration(asset.durationMs / 1000);
+    } else {
+      element = new ImageElement(url, VIDEO_RESOLUTION);
+    }
+
+    await twickAddElement(element);
   }
 
   return (
