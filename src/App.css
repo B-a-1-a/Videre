@@ -232,16 +232,53 @@ button:disabled {
 
 .recent-delete {
   flex-shrink: 0;
-  padding: 0.36rem 0.55rem;
-  border-color: #5a1e1e;
-  background: #241111;
-  color: #f85149;
-  font-size: 0.72rem;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #8b949e;
+  line-height: 0;
 }
 
 .recent-delete:hover:not(:disabled) {
-  background: #3a1616;
-  border-color: #b62324;
+  background: #21262d;
+  color: #f85149;
+}
+
+.trash-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trash-can,
+.trash-lid {
+  transition: transform 0.2s ease;
+  transform-box: fill-box;
+}
+
+.trash-can {
+  transform-origin: center bottom;
+}
+
+.trash-lid {
+  transform-origin: left center;
+}
+
+.recent-delete:hover:not(:disabled) .trash-can {
+  transform: rotate(-10deg);
+}
+
+.recent-delete:hover:not(:disabled) .trash-lid {
+  transform: translateY(-2px);
 }
 
 /* ---- EDITOR SHELL ---- */

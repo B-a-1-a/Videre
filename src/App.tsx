@@ -106,9 +106,21 @@ function HomeView() {
                     disabled={loading}
                     onClick={() => void handleDeleteProject(p)}
                     title={`Delete ${p.name}`}
+                    aria-label={`Delete ${p.name}`}
                     type="button"
                   >
-                    Delete
+                    <svg className="trash-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        className="trash-lid"
+                        d="M9 4h6a1 1 0 0 1 .9.6L16.5 6H20a1 1 0 1 1 0 2H4a1 1 0 1 1 0-2h3.5l.6-1.4A1 1 0 0 1 9 4Z"
+                      />
+                      <path
+                        className="trash-can"
+                        d="M6.8 8h10.4l-.8 11a2 2 0 0 1-2 1.9H9.6a2 2 0 0 1-2-1.9L6.8 8Z"
+                      />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                    </svg>
                   </button>
                 </div>
               ))}
