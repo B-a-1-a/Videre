@@ -38,6 +38,12 @@ Videre is a local-first desktop video editor built with Tauri + React + TypeScri
 
 ## Getting started
 
+### Prerequisites
+
+- Node.js `>=20.19` or `>=22.12` (Vite 7 requirement)
+- `pnpm` 10+
+- Rust toolchain (`rustup`, `cargo`)
+
 ### 1) Install dependencies
 
 ```bash
@@ -52,11 +58,34 @@ pnpm sidecars:fetch
 
 This populates `src-tauri/binaries` for macOS and Windows target names expected by Tauri bundling.
 
+By default it fetches only binaries for your current host platform.  
+Use this to fetch all configured targets:
+
+```bash
+pnpm sidecars:fetch -- --all
+```
+
 ### 3) Run development app
 
 ```bash
 pnpm tauri dev
 ```
+
+## Production bundling
+
+Default build target is `.app` on macOS:
+
+```bash
+pnpm tauri build
+```
+
+To explicitly request DMG packaging:
+
+```bash
+pnpm tauri build --bundles dmg
+```
+
+Note: DMG creation uses `hdiutil` and Finder automation and can fail in sandboxed/headless environments.
 
 ## IPC commands
 

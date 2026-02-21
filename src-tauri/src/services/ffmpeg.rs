@@ -181,30 +181,19 @@ fn parse_frame_rate(value: &str) -> Option<f64> {
 }
 
 fn target_triple() -> &'static str {
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    {
-        return "aarch64-apple-darwin";
+    if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        "aarch64-apple-darwin"
+    } else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
+        "x86_64-apple-darwin"
+    } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+        "x86_64-pc-windows-msvc"
+    } else if cfg!(all(target_os = "windows", target_arch = "aarch64")) {
+        "aarch64-pc-windows-msvc"
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        "x86_64-unknown-linux-gnu"
+    } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+        "aarch64-unknown-linux-gnu"
+    } else {
+        "unknown"
     }
-    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    {
-        return "x86_64-apple-darwin";
-    }
-    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-    {
-        return "x86_64-pc-windows-msvc";
-    }
-    #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
-    {
-        return "aarch64-pc-windows-msvc";
-    }
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    {
-        return "x86_64-unknown-linux-gnu";
-    }
-    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-    {
-        return "aarch64-unknown-linux-gnu";
-    }
-
-    "unknown"
 }

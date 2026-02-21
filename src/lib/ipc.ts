@@ -35,11 +35,11 @@ export async function projectCreate(name: string, location: string): Promise<Pro
 }
 
 export async function projectOpen(projectRoot: string): Promise<ProjectSnapshot> {
-  return invoke<ProjectSnapshot>("project_open", { project_root: projectRoot });
+  return invoke<ProjectSnapshot>("project_open", { projectRoot });
 }
 
 export async function projectSave(projectId: string): Promise<SaveResult> {
-  return invoke<SaveResult>("project_save", { project_id: projectId });
+  return invoke<SaveResult>("project_save", { projectId });
 }
 
 export async function projectListRecent(): Promise<ProjectSummary[]> {
@@ -47,44 +47,38 @@ export async function projectListRecent(): Promise<ProjectSummary[]> {
 }
 
 export async function mediaImport(projectId: string, sourcePaths: string[]): Promise<ImportBatchResult> {
-  return invoke<ImportBatchResult>("media_import", {
-    project_id: projectId,
-    source_paths: sourcePaths,
-  });
+  return invoke<ImportBatchResult>("media_import", { projectId, sourcePaths });
 }
 
 export async function mediaRemove(projectId: string, assetId: string): Promise<OpResult> {
-  return invoke<OpResult>("media_remove", { project_id: projectId, asset_id: assetId });
+  return invoke<OpResult>("media_remove", { projectId, assetId });
 }
 
 export async function timelineGet(projectId: string): Promise<TimelineDto> {
-  return invoke<TimelineDto>("timeline_get", { project_id: projectId });
+  return invoke<TimelineDto>("timeline_get", { projectId });
 }
 
 export async function timelineApplyPatch(projectId: string, patch: TimelinePatchDto): Promise<TimelineDto> {
   return invoke<TimelineDto>("timeline_apply_patch", {
-    project_id: projectId,
+    projectId,
     patch: toRustTimelinePatch(patch),
   });
 }
 
 export async function renderStart(projectId: string, settings: RenderSettingsDto): Promise<RenderJobDto> {
-  return invoke<RenderJobDto>("render_start", { project_id: projectId, settings });
+  return invoke<RenderJobDto>("render_start", { projectId, settings });
 }
 
 export async function renderStatus(projectId: string, jobId: string): Promise<RenderJobDto> {
-  return invoke<RenderJobDto>("render_status", { project_id: projectId, job_id: jobId });
+  return invoke<RenderJobDto>("render_status", { projectId, jobId });
 }
 
 export async function renderCancel(projectId: string, jobId: string): Promise<OpResult> {
-  return invoke<OpResult>("render_cancel", { project_id: projectId, job_id: jobId });
+  return invoke<OpResult>("render_cancel", { projectId, jobId });
 }
 
 export async function analysisEnqueueStub(projectId: string, jobKind: string): Promise<AnalysisJobDto> {
-  return invoke<AnalysisJobDto>("analysis_enqueue_stub", {
-    project_id: projectId,
-    job_kind: jobKind,
-  });
+  return invoke<AnalysisJobDto>("analysis_enqueue_stub", { projectId, jobKind });
 }
 
 export async function onImportProgress(

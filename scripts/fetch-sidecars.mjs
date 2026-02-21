@@ -1,5 +1,13 @@
 #!/usr/bin/env node
-import { mkdir, rm, readdir, cp, chmod, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  rm,
+  readdir,
+  chmod,
+  writeFile,
+  copyFile,
+  realpath,
+} from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -35,6 +43,26 @@ const targets = [
   },
 ];
 
+function selectedTargets() {
+  const all = process.argv.includes("--all");
+  if (all) {
+    return targets;
+  }
+
+  if (process.platform === "darwin" && process.arch === "arm64") {
+    return targets.filter((target) => target.name === "macos-arm64");
+  }
+  if (process.platform === "darwin" && process.arch === "x64") {
+    return targets.filter((target) => target.name === "macos-x64");
+  }
+  if (process.platform === "win32" && process.arch === "x64") {
+    return targets.filter((target) => target.name === "windows-x64");
+  }
+
+  // For uncommon host targets, try fetching all known targets.
+  return targets;
+}
+
 async function downloadFile(url, dest) {
   const response = await fetch(url);
   if (!response.ok) {
@@ -69,12 +97,19 @@ function resolveLocalBinary(name) {
   }
 }
 
+async function copyBinary(src, dest) {
+  // Remove stale files/symlinks so repeated runs stay idempotent.
+  await rm(dest, { force: true });
+  const resolvedSrc = await realpath(src).catch(() => src);
+  await copyFile(resolvedSrc, dest);
+}
+
 async function main() {
   await mkdir(binariesDir, { recursive: true });
   await rm(workDir, { force: true, recursive: true });
   await mkdir(workDir, { recursive: true });
 
-  for (const target of targets) {
+  for (const target of selectedTargets()) {
     console.log(`Fetching sidecars for ${target.name}...`);
     const targetDir = join(workDir, target.name);
     await mkdir(targetDir, { recursive: true });
@@ -130,8 +165,8 @@ async function main() {
     const ffmpegDest = join(binariesDir, target.ffmpegOut);
     const ffprobeDest = join(binariesDir, target.ffprobeOut);
 
-    await cp(ffmpegSource, ffmpegDest, { force: true });
-    await cp(ffprobeSource, ffprobeDest, { force: true });
+    await copyBinary(ffmpegSource, ffmpegDest);
+    await copyBinary(ffprobeSource, ffprobeDest);
 
     if (!target.windows) {
       await chmod(ffmpegDest, 0o755);

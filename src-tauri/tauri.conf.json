@@ -25,7 +25,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "app"
+    ],
     "externalBin": [
       "binaries/ffmpeg",
       "binaries/ffprobe"
