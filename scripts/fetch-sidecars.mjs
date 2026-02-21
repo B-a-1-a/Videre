@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 import { mkdir, rm, readdir, cp, chmod, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
-import { execFileSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
+import { platform } from "node:os";
 
-const repoRoot = resolve(new URL("..", import.meta.url).pathname);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const repoRoot = resolve(__dirname, "..");
 const binariesDir = join(repoRoot, "src-tauri", "binaries");
 const workDir = join(tmpdir(), `videre-sidecars-${Date.now()}`);
 
-const targets = [
+const allTargets = [
   {
     name: "macos-arm64",
     ffmpegUrl: "https://evermeet.cx/ffmpeg/getrelease/zip",
@@ -16,6 +20,7 @@ const targets = [
     ffmpegOut: "ffmpeg-aarch64-apple-darwin",
     ffprobeOut: "ffprobe-aarch64-apple-darwin",
     windows: false,
+    platform: "darwin",
   },
   {
     name: "macos-x64",
@@ -24,6 +29,7 @@ const targets = [
     ffmpegOut: "ffmpeg-x86_64-apple-darwin",
     ffprobeOut: "ffprobe-x86_64-apple-darwin",
     windows: false,
+    platform: "darwin",
   },
   {
     name: "windows-x64",
@@ -32,8 +38,17 @@ const targets = [
     ffmpegOut: "ffmpeg-x86_64-pc-windows-msvc.exe",
     ffprobeOut: "ffprobe-x86_64-pc-windows-msvc.exe",
     windows: true,
+    platform: "win32",
   },
 ];
+
+// Only fetch sidecars for the current platform (avoids cross-platform zip issues)
+const currentPlatform = platform();
+const targets = allTargets.filter((t) => t.platform === currentPlatform);
+if (targets.length === 0) {
+  console.error(`No sidecar targets for platform: ${currentPlatform}`);
+  process.exit(1);
+}
 
 async function downloadFile(url, dest) {
   const response = await fetch(url);
@@ -42,6 +57,17 @@ async function downloadFile(url, dest) {
   }
   const bytes = Buffer.from(await response.arrayBuffer());
   await writeFile(dest, bytes);
+}
+
+function extractZip(zipPath, destDir) {
+  if (platform() === "win32") {
+    execSync(
+      `powershell -NoProfile -Command "Expand-Archive -Path '${zipPath.replace(/'/g, "''")}' -DestinationPath '${destDir.replace(/'/g, "''")}' -Force"`,
+      { stdio: "inherit" }
+    );
+  } else {
+    execFileSync("unzip", ["-o", zipPath, "-d", destDir], { stdio: "inherit" });
+  }
 }
 
 async function findFileRecursively(dir, filename) {
@@ -83,9 +109,9 @@ async function main() {
     const extractDir = join(targetDir, "extract");
     await mkdir(extractDir, { recursive: true });
 
-    execFileSync("unzip", ["-o", ffmpegZip, "-d", extractDir], { stdio: "inherit" });
+    extractZip(ffmpegZip, extractDir);
     if (ffprobeZip !== ffmpegZip) {
-      execFileSync("unzip", ["-o", ffprobeZip, "-d", extractDir], { stdio: "inherit" });
+      extractZip(ffprobeZip, extractDir);
     }
 
     const ffmpegSource = await findFileRecursively(extractDir, target.windows ? "ffmpeg.exe" : "ffmpeg");
@@ -104,6 +130,21 @@ async function main() {
     if (!target.windows) {
       await chmod(ffmpegDest, 0o755);
       await chmod(ffprobeDest, 0o755);
+    }
+  }
+
+  // On Windows ARM64 the bundler looks for aarch64-named sidecars; copy x64 binaries to those names
+  if (currentPlatform === "win32") {
+    const x64Ffmpeg = join(binariesDir, "ffmpeg-x86_64-pc-windows-msvc.exe");
+    const x64Ffprobe = join(binariesDir, "ffprobe-x86_64-pc-windows-msvc.exe");
+    const arm64Ffmpeg = join(binariesDir, "ffmpeg-aarch64-pc-windows-msvc.exe");
+    const arm64Ffprobe = join(binariesDir, "ffprobe-aarch64-pc-windows-msvc.exe");
+    try {
+      await cp(x64Ffmpeg, arm64Ffmpeg, { force: true });
+      await cp(x64Ffprobe, arm64Ffprobe, { force: true });
+      console.log("Copied x64 sidecars to aarch64 names for bundler.");
+    } catch {
+      // x64 binaries not present, skip
     }
   }
 

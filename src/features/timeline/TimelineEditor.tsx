@@ -72,7 +72,8 @@ export function TimelineEditor() {
   }
 
   async function addTrack(kind: "video" | "audio") {
-    await patch([{ type: "add_track", kind, name: `${kind === "video" ? "Video" : "Audio"} ${timeline.tracks.length + 1}` }]);
+    const count = timeline?.tracks.length ?? 0;
+    await patch([{ type: "add_track", kind, name: `${kind === "video" ? "Video" : "Audio"} ${count + 1}` }]);
   }
 
   async function reorderTrack(track: Track, direction: "up" | "down") {

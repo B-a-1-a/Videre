@@ -206,5 +206,6 @@ fn target_triple() -> &'static str {
         return "aarch64-unknown-linux-gnu";
     }
 
+    #[allow(unreachable_code)]
     "unknown"
 }
