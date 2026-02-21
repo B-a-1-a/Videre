@@ -61,6 +61,14 @@ async function findFileRecursively(dir, filename) {
   return null;
 }
 
+function resolveLocalBinary(name) {
+  try {
+    return execFileSync("which", [name], { encoding: "utf8" }).trim();
+  } catch {
+    return null;
+  }
+}
+
 async function main() {
   await mkdir(binariesDir, { recursive: true });
   await rm(workDir, { force: true, recursive: true });
@@ -77,22 +85,46 @@ async function main() {
       target.ffprobeUrl === target.ffmpegUrl ? "ffmpeg.zip" : "ffprobe.zip",
     );
 
-    await downloadFile(target.ffmpegUrl, ffmpegZip);
-    await downloadFile(target.ffprobeUrl, ffprobeZip);
-
     const extractDir = join(targetDir, "extract");
     await mkdir(extractDir, { recursive: true });
+    let downloaded = false;
 
-    execFileSync("unzip", ["-o", ffmpegZip, "-d", extractDir], { stdio: "inherit" });
-    if (ffprobeZip !== ffmpegZip) {
-      execFileSync("unzip", ["-o", ffprobeZip, "-d", extractDir], { stdio: "inherit" });
+    try {
+      await downloadFile(target.ffmpegUrl, ffmpegZip);
+      if (ffprobeZip !== ffmpegZip) {
+        await downloadFile(target.ffprobeUrl, ffprobeZip);
+      }
+
+      execFileSync("unzip", ["-o", ffmpegZip, "-d", extractDir], { stdio: "inherit" });
+      if (ffprobeZip !== ffmpegZip) {
+        execFileSync("unzip", ["-o", ffprobeZip, "-d", extractDir], { stdio: "inherit" });
+      }
+      downloaded = true;
+    } catch (error) {
+      if (target.windows) {
+        throw error;
+      }
+      console.warn(
+        `Download/extract failed for ${target.name}, falling back to local binaries when available.`,
+      );
     }
 
-    const ffmpegSource = await findFileRecursively(extractDir, target.windows ? "ffmpeg.exe" : "ffmpeg");
-    const ffprobeSource = await findFileRecursively(extractDir, target.windows ? "ffprobe.exe" : "ffprobe");
+    let ffmpegSource = downloaded
+      ? await findFileRecursively(extractDir, target.windows ? "ffmpeg.exe" : "ffmpeg")
+      : null;
+    let ffprobeSource = downloaded
+      ? await findFileRecursively(extractDir, target.windows ? "ffprobe.exe" : "ffprobe")
+      : null;
+
+    if (!target.windows) {
+      ffmpegSource ??= resolveLocalBinary("ffmpeg");
+      ffprobeSource ??= resolveLocalBinary("ffprobe");
+    }
 
     if (!ffmpegSource || !ffprobeSource) {
-      throw new Error(`Failed to locate ffmpeg/ffprobe binaries for ${target.name}`);
+      throw new Error(
+        `Failed to locate ffmpeg/ffprobe binaries for ${target.name} (ffmpeg: ${Boolean(ffmpegSource)}, ffprobe: ${Boolean(ffprobeSource)})`,
+      );
     }
 
     const ffmpegDest = join(binariesDir, target.ffmpegOut);
