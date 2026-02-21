@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { confirm, open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { VideoElement, AudioElement, ImageElement } from "@twick/timeline";
 import { useBrowserRenderer } from "@twick/browser-render";
@@ -13,6 +13,7 @@ import {
 } from "./lib/ipc";
 import { TwickEditor } from "./features/timeline/TwickEditor";
 import { useEditorStore } from "./store/editorStore";
+import type { ProjectSummary } from "./types/domain";
 import "./App.css";
 
 const VIDEO_RESOLUTION = { width: 1920, height: 1080 };
@@ -27,6 +28,7 @@ function HomeView() {
   const createProject = useEditorStore((s) => s.createProject);
   const openProject = useEditorStore((s) => s.openProject);
   const openProjectBySummary = useEditorStore((s) => s.openProjectBySummary);
+  const deleteProject = useEditorStore((s) => s.deleteProject);
 
   async function handleCreate() {
     const folder = await open({ directory: true, multiple: false, title: "Choose parent folder" });
@@ -38,6 +40,20 @@ function HomeView() {
     const folder = await open({ directory: true, multiple: false, title: "Select project folder" });
     if (!folder || Array.isArray(folder)) return;
     await openProject(folder);
+  }
+
+  async function handleDeleteProject(project: ProjectSummary) {
+    const approved = await confirm(
+      `Delete '${project.name}'?\nThis permanently removes the project folder and all its files.`,
+      {
+        title: "Delete project",
+        kind: "warning",
+        okLabel: "Delete",
+        cancelLabel: "Cancel",
+      },
+    );
+    if (!approved) return;
+    await deleteProject(project);
   }
 
   return (
@@ -75,15 +91,26 @@ function HomeView() {
             <div className="home-label">Recent</div>
             <div className="recent-list">
               {recentProjects.map((p) => (
-                <button
-                  className="recent-item"
-                  key={p.id}
-                  onClick={() => void openProjectBySummary(p)}
-                  type="button"
-                >
-                  <span className="recent-name">{p.name}</span>
-                  <span className="recent-path">{p.rootPath}</span>
-                </button>
+                <div className="recent-item-row" key={p.id}>
+                  <button
+                    className="recent-item"
+                    disabled={loading}
+                    onClick={() => void openProjectBySummary(p)}
+                    type="button"
+                  >
+                    <span className="recent-name">{p.name}</span>
+                    <span className="recent-path">{p.rootPath}</span>
+                  </button>
+                  <button
+                    className="recent-delete"
+                    disabled={loading}
+                    onClick={() => void handleDeleteProject(p)}
+                    title={`Delete ${p.name}`}
+                    type="button"
+                  >
+                    Delete
+                  </button>
+                </div>
               ))}
             </div>
           </div>

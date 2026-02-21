@@ -46,6 +46,10 @@ export async function projectListRecent(): Promise<ProjectSummary[]> {
   return invoke<ProjectSummary[]>("project_list_recent");
 }
 
+export async function projectDelete(projectId: string): Promise<OpResult> {
+  return invoke<OpResult>("project_delete", { projectId });
+}
+
 export async function mediaImport(projectId: string, sourcePaths: string[]): Promise<ImportBatchResult> {
   return invoke<ImportBatchResult>("media_import", { projectId, sourcePaths });
 }

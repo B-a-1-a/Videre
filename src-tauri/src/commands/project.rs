@@ -10,7 +10,7 @@ use crate::{
         run_migrations, touch_project,
     },
     error::{AppResult, ErrorEnvelope},
-    model::{ProjectSnapshot, ProjectSummary, SaveResult},
+    model::{OpResult, ProjectSnapshot, ProjectSummary, SaveResult},
     state::AppState,
 };
 
@@ -117,6 +117,57 @@ pub fn project_list_recent(app: tauri::AppHandle) -> AppResult<Vec<ProjectSummar
     Ok(read_recent_projects(&app)?.projects)
 }
 
+#[tauri::command]
+pub fn project_delete(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    project_id: String,
+) -> AppResult<OpResult> {
+    let mut recent = read_recent_projects(&app)?;
+    let recent_summary = recent.projects.iter().find(|p| p.id == project_id).cloned();
+
+    let root = if let Some(path) = state.project_root(&project_id) {
+        path
+    } else if let Some(summary) = &recent_summary {
+        PathBuf::from(&summary.root_path)
+    } else {
+        return Err(ErrorEnvelope::not_found("Project not found."));
+    };
+
+    let message = if root.exists() {
+        if !root.is_dir() {
+            return Err(ErrorEnvelope::invalid_input("Project path is not a directory."));
+        }
+
+        let db_path = project_db_path(&root);
+        if db_path.exists() {
+            let conn = open_connection(&db_path)?;
+            let found_project_id: String =
+                conn.query_row("SELECT id FROM projects LIMIT 1", params![], |row| row.get(0))?;
+            if found_project_id != project_id {
+                return Err(ErrorEnvelope::invalid_input(
+                    "Project id does not match project folder.",
+                ));
+            }
+        } else {
+            return Err(ErrorEnvelope::invalid_input(
+                "Invalid project: missing project.db",
+            ));
+        }
+
+        fs::remove_dir_all(&root)?;
+        "Project deleted.".to_string()
+    } else {
+        "Project was already missing on disk; removed from recent list.".to_string()
+    };
+
+    recent.projects.retain(|project| project.id != project_id);
+    persist_recent_projects(&app, &recent)?;
+    state.remove_project_root(&project_id);
+
+    Ok(OpResult { ok: true, message })
+}
+
 pub fn resolve_project_root(
     app: &tauri::AppHandle,
     state: &tauri::State<'_, AppState>,
@@ -161,13 +212,17 @@ fn persist_recent_project(app: &tauri::AppHandle, summary: &ProjectSummary) -> A
     data.projects.insert(0, summary.clone());
     data.projects.truncate(20);
 
+    persist_recent_projects(app, &data)
+}
+
+fn persist_recent_projects(app: &tauri::AppHandle, data: &RecentProjectsFile) -> AppResult<()> {
     let path = recent_projects_path(app);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
     fs::write(
         path,
-        serde_json::to_string_pretty(&data).map_err(ErrorEnvelope::from)?,
+        serde_json::to_string_pretty(data).map_err(ErrorEnvelope::from)?,
     )?;
     Ok(())
 }

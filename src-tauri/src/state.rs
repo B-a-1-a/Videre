@@ -34,6 +34,12 @@ impl AppState {
             .and_then(|roots| roots.get(project_id).cloned())
     }
 
+    pub fn remove_project_root(&self, project_id: &str) {
+        if let Ok(mut roots) = self.project_roots.lock() {
+            roots.remove(project_id);
+        }
+    }
+
     pub fn set_render_cancel_flag(&self, job_id: String, flag: Arc<AtomicBool>) {
         if let Ok(mut map) = self.render_cancellations.lock() {
             map.insert(job_id, flag);

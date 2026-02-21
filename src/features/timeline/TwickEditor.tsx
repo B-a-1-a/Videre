@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { LivePlayerProvider } from "@twick/live-player";
 import { TimelineProvider, INITIAL_TIMELINE_DATA } from "@twick/timeline";
 import { TwickStudio, useEditorManager, useTimelineContext } from "@twick/studio";
@@ -11,15 +11,30 @@ function TwickBridge() {
   const { editor } = useTimelineContext();
   const setTwickAddElement = useEditorStore((s) => s.setTwickAddElement);
   const setTwickGetTimelineData = useEditorStore((s) => s.setTwickGetTimelineData);
+  const addElementRef = useRef(addElement);
+  const editorRef = useRef(editor);
 
   useEffect(() => {
-    setTwickAddElement(addElement as (element: unknown) => Promise<void>);
-    setTwickGetTimelineData(() => editor.getTimelineData());
+    addElementRef.current = addElement;
+    editorRef.current = editor;
+  }, [addElement, editor]);
+
+  const addElementProxy = useCallback(async (element: unknown) => {
+    await addElementRef.current(element as never);
+  }, []);
+
+  const getTimelineDataProxy = useCallback(() => {
+    return editorRef.current.getTimelineData();
+  }, []);
+
+  useEffect(() => {
+    setTwickAddElement(addElementProxy);
+    setTwickGetTimelineData(getTimelineDataProxy);
     return () => {
       setTwickAddElement(null);
       setTwickGetTimelineData(null);
     };
-  }, [addElement, editor, setTwickAddElement, setTwickGetTimelineData]);
+  }, [addElementProxy, getTimelineDataProxy, setTwickAddElement, setTwickGetTimelineData]);
 
   return null;
 }
@@ -49,25 +64,24 @@ export function TwickEditor() {
 
   if (!currentProject) return null;
 
+  // key on LivePlayerProvider ensures full remount when project changes.
+  // No extra wrapper div here; TwickStudio controls its own sizing.
+  // .twick-wrapper on the parent layout handles clipping/overflow.
   return (
-    // twick-fill ensures the studio fills the parent container
-    // key ensures TwickStudio fully remounts (with fresh providers) when project changes
-    <div className="twick-fill">
-      <LivePlayerProvider key={currentProject.id}>
-        <TimelineProvider
-          contextId={currentProject.id}
-          initialData={initialData}
-          analytics={{ enabled: false }}
-        >
-          <TwickBridge />
-          <TwickStudio
-            studioConfig={{
-              videoProps: { width: 1920, height: 1080 },
-              saveProject: handleSaveProject,
-            }}
-          />
-        </TimelineProvider>
-      </LivePlayerProvider>
-    </div>
+    <LivePlayerProvider key={currentProject.id}>
+      <TimelineProvider
+        contextId={currentProject.id}
+        initialData={initialData}
+        analytics={{ enabled: false }}
+      >
+        <TwickBridge />
+        <TwickStudio
+          studioConfig={{
+            videoProps: { width: 1920, height: 1080 },
+            saveProject: handleSaveProject,
+          }}
+        />
+      </TimelineProvider>
+    </LivePlayerProvider>
   );
 }

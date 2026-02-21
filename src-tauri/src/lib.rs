@@ -22,6 +22,7 @@ pub fn run() {
             commands::project::project_open,
             commands::project::project_save,
             commands::project::project_list_recent,
+            commands::project::project_delete,
             commands::media::media_import,
             commands::media::media_remove,
             commands::timeline::timeline_get,

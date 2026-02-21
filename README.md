@@ -44,32 +44,45 @@ Videre is a local-first desktop video editor built with Tauri + React + TypeScri
 - `pnpm` 10+
 - Rust toolchain (`rustup`, `cargo`)
 
-### 1) Install dependencies
+### Desktop startup (recommended)
+
+```bash
+./scripts/start-dev.sh
+```
+
+This is the recommended way to run the app locally because it follows the full Tauri desktop flow:
+
+- Installs JS dependencies
+- Fetches FFmpeg/FFprobe sidecars
+- Builds frontend assets
+- Starts `pnpm tauri dev`
+
+Optional flags:
+
+- `./scripts/start-dev.sh --all-sidecars`
+- `./scripts/start-dev.sh --skip-build`
+
+### Manual desktop startup commands
+
+Use this if you prefer to run each step explicitly:
 
 ```bash
 pnpm install
-```
-
-### 2) Optional: fetch pinned sidecar binaries
-
-```bash
 pnpm sidecars:fetch
+pnpm build
+pnpm tauri dev
 ```
 
-This populates `src-tauri/binaries` for macOS and Windows target names expected by Tauri bundling.
-
-By default it fetches only binaries for your current host platform.  
-Use this to fetch all configured targets:
+To fetch sidecars for all configured targets:
 
 ```bash
 pnpm sidecars:fetch -- --all
 ```
 
-### 3) Run development app
+### Important
 
-```bash
-pnpm tauri dev
-```
+For full desktop behavior (filesystem dialogs, sidecars, Tauri IPC), run via `pnpm tauri dev` or `./scripts/start-dev.sh`.  
+`pnpm dev` (Vite-only) does not provide the full desktop runtime.
 
 ## Production bundling
 
@@ -93,6 +106,7 @@ Note: DMG creation uses `hdiutil` and Finder automation and can fail in sandboxe
 - `project_open(project_root)`
 - `project_save(project_id)`
 - `project_list_recent()`
+- `project_delete(project_id)`
 - `media_import(project_id, source_paths)`
 - `media_remove(project_id, asset_id)`
 - `timeline_get(project_id)`

@@ -13,6 +13,7 @@ import {
   mediaImport,
   mediaRemove,
   projectCreate,
+  projectDelete,
   projectListRecent,
   projectOpen,
   projectSave,
@@ -50,6 +51,7 @@ type EditorState = {
   createProject: (name: string, location: string) => Promise<void>;
   openProject: (projectRoot: string) => Promise<void>;
   openProjectBySummary: (summary: ProjectSummary) => Promise<void>;
+  deleteProject: (summary: ProjectSummary) => Promise<void>;
   saveProject: () => Promise<void>;
   importMedia: (sourcePaths: string[]) => Promise<void>;
   removeAsset: (assetId: string) => Promise<void>;
@@ -164,6 +166,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   openProjectBySummary: async (summary: ProjectSummary) => {
     await get().openProject(summary.rootPath);
+  },
+
+  deleteProject: async (summary: ProjectSummary) => {
+    set({ loading: true, errorMessage: undefined, statusMessage: `Deleting '${summary.name}'...` });
+    try {
+      await projectDelete(summary.id);
+      const currentProject = get().currentProject;
+      if (currentProject?.id === summary.id) {
+        get().closeProject();
+      }
+      set({
+        recentProjects: get().recentProjects.filter((project) => project.id !== summary.id),
+        statusMessage: `Deleted project '${summary.name}'.`,
+      });
+      await get().loadRecentProjects();
+    } catch (error) {
+      set({ errorMessage: normalizeError(error) });
+    } finally {
+      set({ loading: false });
+    }
   },
 
   saveProject: async () => {
