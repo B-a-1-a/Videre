@@ -17,11 +17,6 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-opener": "^2",
-    "@twick/browser-render": "^0.15.19",
-    "@twick/live-player": "^0.15.19",
-    "@twick/media-utils": "^0.15.19",
-    "@twick/studio": "^0.15.19",
-    "@twick/timeline": "^0.15.19",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zustand": "^5.0.8"

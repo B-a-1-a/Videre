@@ -373,12 +373,6 @@ button:disabled {
   flex-shrink: 0;
 }
 
-.btn-assets.active {
-  background: #1f3a5f;
-  border-color: #388bfd;
-  color: #79c0ff;
-}
-
 /* ---- EDITOR BODY ---- */
 
 /* Sits below the topbar, fills remaining viewport */
@@ -391,41 +385,6 @@ button:disabled {
   display: flex;
   min-height: 0;
   overflow: hidden;
-}
-
-/* Flex sibling of .assets-panel; fills remaining width */
-.twick-wrapper {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-  position: relative;
-}
-
-/* ---- ASSETS PANEL ---- */
-
-.assets-panel {
-  width: 230px;
-  flex-shrink: 0;
-  background: #161820;
-  border-right: 1px solid #21262d;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.assets-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.55rem 0.7rem;
-  border-bottom: 1px solid #21262d;
-  font-size: 0.73rem;
-  font-weight: 600;
-  color: #8b949e;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
 }
 
 .assets-import-btn {
@@ -443,12 +402,6 @@ button:disabled {
 .assets-import-btn:hover:not(:disabled) {
   background: #1f3a5f;
   border-color: #388bfd;
-}
-
-.assets-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.25rem;
 }
 
 .assets-empty {
@@ -552,53 +505,451 @@ button:disabled {
   white-space: nowrap;
 }
 
-/* ---- TWICK FILL ---- */
+/* ---- LEFT PANEL ---- */
 
-/*
- * Twick's defaults use viewport units (100dvh/80dvh), which overflows in our
- * shell because we reserve vertical space for a host app topbar.
- * Force Twick to size to this container instead.
- */
-.twick-fill {
-  height: 100%;
+.left-panel {
+  width: 260px;
+  flex-shrink: 0;
+  background: #161820;
+  border-right: 1px solid #21262d;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.twick-wrapper .studio-container {
-  width: 100% !important;
-  height: 100% !important;
+/* ---- MEDIA PANEL ---- */
+
+.media-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   min-height: 0;
 }
 
-.twick-wrapper .studio-content {
-  height: calc(100% - 56px) !important;
+.media-panel-header {
+  display: flex;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid #21262d;
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.media-panel-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+/* ---- CLIP INSPECTOR ---- */
+
+.clip-inspector {
+  border-top: 1px solid #21262d;
+  padding: 0.55rem 0.7rem;
+  flex-shrink: 0;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.inspector-empty {
+  color: #7d8590;
+  font-size: 0.78rem;
+  text-align: center;
+  padding: 0.75rem 0;
+}
+
+.inspector-header {
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 0.5rem;
+}
+
+.inspector-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.inspector-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.inspector-field label {
+  width: 60px;
+  flex-shrink: 0;
+  color: #7d8590;
+  font-size: 0.72rem;
+}
+
+.inspector-field input {
+  flex: 1;
+  min-width: 0;
+  background: #0d0f15;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  color: #e6edf3;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.inspector-field input:focus {
+  border-color: #58a6ff;
+}
+
+.inspector-value {
+  color: #c9d1d9;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspector-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.inspector-actions button {
+  font-size: 0.72rem;
+  padding: 0.22rem 0.5rem;
+}
+
+/* ---- EDITOR MAIN AREA ---- */
+
+.editor-main {
+  flex: 1;
+  min-width: 0;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.twick-wrapper .main-container,
-.twick-wrapper .canvas-wrapper,
-.twick-wrapper .canvas-container,
-.twick-wrapper .twick-editor-main-container {
+/* ---- VIDEO PREVIEW ---- */
+
+.video-preview {
+  flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  position: relative;
 }
 
-.twick-wrapper .twick-editor-main-container {
-  height: 100% !important;
-}
-
-.twick-wrapper .twick-editor-view-section {
-  flex: 1 1 auto;
+.video-preview-canvas {
+  flex: 1;
   min-height: 0;
-  height: auto !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
-.twick-wrapper .twick-editor-container {
-  height: 100% !important;
+.video-preview-canvas video {
+  max-width: 100%;
   max-height: 100%;
+  object-fit: contain;
 }
 
-.twick-wrapper .twick-editor-timeline-section {
-  flex: 0 0 auto;
-  min-height: 0;
-  height: auto !important;
-  max-height: clamp(152px, 30vh, 300px);
+.video-preview-empty {
+  color: #7d8590;
+  font-size: 0.82rem;
+}
+
+.video-preview-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.4rem 0.75rem;
+  background: #161820;
+  border-top: 1px solid #21262d;
+}
+
+.play-pause-btn {
+  font-size: 1rem;
+  padding: 0.15rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: #c9d1d9;
+  cursor: pointer;
+}
+
+.play-pause-btn:hover {
+  color: #e6edf3;
+  background: #21262d;
+}
+
+.timecode {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  color: #8b949e;
+}
+
+/* ---- TIMELINE ---- */
+
+.timeline-container {
+  flex-shrink: 0;
+  height: clamp(180px, 30vh, 350px);
+  background: #0d0e12;
+  border-top: 1px solid #21262d;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.timeline-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.5rem;
+  background: #161820;
+  border-bottom: 1px solid #21262d;
+}
+
+.timeline-toolbar button {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.timeline-scroll-area {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.timeline-content {
+  min-width: 100%;
+}
+
+.timeline-ruler-row {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #161820;
+}
+
+/* ---- RULER ---- */
+
+.timeline-ruler {
+  position: relative;
+  background: #161820;
+  border-bottom: 1px solid #21262d;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ruler-tick {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: #30363d;
+}
+
+.ruler-tick-label {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.65rem;
+  color: #7d8590;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ---- TRACK ---- */
+
+.track-row {
+  display: flex;
+  border-bottom: 1px solid #1c1f28;
+}
+
+.track-row.selected {
+  background: #141720;
+}
+
+.track-header {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.5rem;
+  background: #161820;
+  border-right: 1px solid #21262d;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.track-header:hover {
+  background: #1c1f2a;
+}
+
+.track-kind-icon {
+  font-size: 0.72rem;
+  color: #7d8590;
+}
+
+.track-name {
+  font-size: 0.75rem;
+  color: #c9d1d9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-lane {
+  position: relative;
+  min-height: 48px;
+  cursor: crosshair;
+}
+
+/* ---- CLIP ---- */
+
+.timeline-clip {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  border: 1px solid transparent;
+  transition: border-color 0.1s;
+}
+
+.timeline-clip:active {
+  cursor: grabbing;
+}
+
+.timeline-clip.clip-video {
+  background: #1a3a5c;
+  border-color: #2a5a8c;
+}
+
+.timeline-clip.clip-audio {
+  background: #1a3c2a;
+  border-color: #2a6c3a;
+}
+
+.timeline-clip.clip-image {
+  background: #2a1a4c;
+  border-color: #4a2a7c;
+}
+
+.timeline-clip.selected {
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 1px #58a6ff40;
+}
+
+.clip-body {
+  flex: 1;
+  min-width: 0;
+  padding: 0 0.35rem;
+  overflow: hidden;
+}
+
+.clip-label {
+  font-size: 0.68rem;
+  color: #c9d1d9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clip-trim-handle {
+  width: 6px;
+  flex-shrink: 0;
+  height: 100%;
+  cursor: ew-resize;
+  background: transparent;
+  transition: background 0.1s;
+}
+
+.clip-trim-handle:hover {
+  background: #58a6ff40;
+}
+
+.clip-trim-left {
+  border-radius: 5px 0 0 5px;
+}
+
+.clip-trim-right {
+  border-radius: 0 5px 5px 0;
+}
+
+/* ---- PLAYHEAD ---- */
+
+.timeline-playhead-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.playhead {
+  position: absolute;
+  top: 0;
+  width: 0;
+  pointer-events: none;
+}
+
+.playhead-handle {
+  position: absolute;
+  left: -6px;
+  width: 13px;
+  background: #f85149;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  cursor: grab;
+  pointer-events: all;
+  z-index: 21;
+}
+
+.playhead-handle:active {
+  cursor: grabbing;
+}
+
+.playhead-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 100%;
+  background: #f85149;
+  transform: translateX(-1px);
+}
+
+/* ---- ZOOM CONTROL ---- */
+
+.zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: default;
+}
+
+.zoom-label {
+  font-size: 0.72rem;
+  color: #7d8590;
+}
+
+.zoom-control input[type="range"] {
+  width: 80px;
+  height: 4px;
+  accent-color: #58a6ff;
+  cursor: pointer;
 }

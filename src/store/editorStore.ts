@@ -8,6 +8,7 @@ import type {
   RenderSettingsDto,
   TimelineDto,
   TimelineOperation,
+  TrackKind,
 } from "../types/domain";
 import {
   mediaImport,
@@ -22,8 +23,6 @@ import {
   renderStatus,
   timelineApplyPatch,
   timelineGet,
-  timelineGetJson,
-  timelineSaveJson,
 } from "../lib/ipc";
 
 type EditorState = {
@@ -40,13 +39,7 @@ type EditorState = {
   statusMessage?: string;
   errorMessage?: string;
   importProgressByAssetId: Record<string, number>;
-  twickTimelineJson: string | null;
-  twickAddElement: ((element: unknown) => Promise<void>) | null;
-  setTwickAddElement: (fn: ((element: unknown) => Promise<void>) | null) => void;
-  twickGetTimelineData: (() => unknown) | null;
-  setTwickGetTimelineData: (fn: (() => unknown) | null) => void;
-  loadTwickTimeline: (projectId: string) => Promise<void>;
-  saveTwickTimeline: (projectId: string, json: string) => Promise<void>;
+  isPlaying: boolean;
   loadRecentProjects: () => Promise<void>;
   createProject: (name: string, location: string) => Promise<void>;
   openProject: (projectRoot: string) => Promise<void>;
@@ -65,6 +58,11 @@ type EditorState = {
   updateImportProgress: (assetId: string, progress: number) => void;
   clearError: () => void;
   closeProject: () => void;
+  togglePlayback: () => void;
+  deleteSelectedClip: () => Promise<void>;
+  splitAtPlayhead: () => Promise<void>;
+  addTrack: (kind: TrackKind) => Promise<void>;
+  removeTrack: (trackId: string) => Promise<void>;
   startRender: (settings: RenderSettingsDto) => Promise<void>;
   pollRenderStatus: () => Promise<void>;
   cancelRender: () => Promise<void>;
@@ -101,29 +99,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   zoomPxPerSec: 100,
   loading: false,
   importProgressByAssetId: {},
-  twickTimelineJson: null,
-  twickAddElement: null,
-  setTwickAddElement: (fn) => set({ twickAddElement: fn }),
-  twickGetTimelineData: null,
-  setTwickGetTimelineData: (fn) => set({ twickGetTimelineData: fn }),
-
-  loadTwickTimeline: async (projectId: string) => {
-    try {
-      const twickTimelineJson = await timelineGetJson(projectId);
-      set({ twickTimelineJson });
-    } catch {
-      // non-fatal: twick timeline may not exist yet for older projects
-    }
-  },
-
-  saveTwickTimeline: async (projectId: string, json: string) => {
-    try {
-      await timelineSaveJson(projectId, json);
-      set({ twickTimelineJson: json });
-    } catch (error) {
-      set({ errorMessage: normalizeError(error) });
-    }
-  },
+  isPlaying: false,
 
   loadRecentProjects: async () => {
     try {
@@ -154,7 +130,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     try {
       const snapshot = await projectOpen(projectRoot);
       setSnapshot(snapshot);
-      await get().loadTwickTimeline(snapshot.summary.id);
       await get().loadRecentProjects();
       set({ statusMessage: `Opened project '${snapshot.summary.name}'.` });
     } catch (error) {
@@ -293,10 +268,43 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       playheadMs: 0,
       renderJob: undefined,
       importProgressByAssetId: {},
-      twickTimelineJson: null,
+      isPlaying: false,
       errorMessage: undefined,
       statusMessage: undefined,
     });
+  },
+
+  togglePlayback: () => {
+    set((state) => ({ isPlaying: !state.isPlaying }));
+  },
+
+  deleteSelectedClip: async () => {
+    const { selectedClipId } = get();
+    if (!selectedClipId) return;
+    await get().applyTimelinePatch([{ type: "delete_clip", clipId: selectedClipId }]);
+    set({ selectedClipId: undefined });
+  },
+
+  splitAtPlayhead: async () => {
+    const { selectedClipId, playheadMs, timeline } = get();
+    if (!selectedClipId || !timeline) return;
+    const clip = timeline.clips.find((c) => c.id === selectedClipId);
+    if (!clip) return;
+    const clipEnd = clip.timelineStartMs + (clip.sourceOutMs - clip.sourceInMs);
+    if (playheadMs > clip.timelineStartMs && playheadMs < clipEnd) {
+      await get().applyTimelinePatch([
+        { type: "split_clip", clipId: clip.id, atTimelineMs: playheadMs },
+      ]);
+    }
+  },
+
+  addTrack: async (kind: TrackKind) => {
+    const name = kind === "audio" ? "Audio" : "Video";
+    await get().applyTimelinePatch([{ type: "add_track", kind, name }]);
+  },
+
+  removeTrack: async (trackId: string) => {
+    await get().applyTimelinePatch([{ type: "remove_track", trackId }]);
   },
 
   startRender: async (settings) => {
@@ -353,7 +361,7 @@ function setSnapshot(snapshot: ProjectSnapshot) {
     errorMessage: undefined,
     renderJob: undefined,
     importProgressByAssetId: {},
-    twickTimelineJson: null,
+    isPlaying: false,
   });
 }
 
