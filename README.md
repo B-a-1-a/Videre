@@ -119,6 +119,14 @@ For isolated Python-based ASR captioning experiments (no Tauri integration), use
 
 See `/Users/bala/Repos/Videre/nexa-caption-lab/README.md` for setup and CLI usage.
 
+## Standalone Nexa Video Context Lab
+
+For isolated Python-based video context workflows with timestamp sections (`find`, `select-part`, `clip`), use:
+
+- `/Users/bala/Repos/Videre/nexa-video-context-lab`
+
+See `/Users/bala/Repos/Videre/nexa-video-context-lab/README.md` for setup and CLI usage.
+
 ## Security notes
 
 - Path handling is constrained to opened project roots.

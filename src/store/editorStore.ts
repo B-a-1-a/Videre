@@ -62,6 +62,7 @@ type EditorState = {
   setSelectedTrack: (trackId?: string) => void;
   updateImportProgress: (assetId: string, progress: number) => void;
   clearError: () => void;
+  closeProject: () => void;
   startRender: (settings: RenderSettingsDto) => Promise<void>;
   pollRenderStatus: () => Promise<void>;
   cancelRender: () => Promise<void>;
@@ -259,6 +260,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   clearError: () => set({ errorMessage: undefined }),
+
+  closeProject: () => {
+    useEditorStore.setState({
+      currentProject: undefined,
+      assets: [],
+      timeline: undefined,
+      selectedTrackId: undefined,
+      selectedClipId: undefined,
+      playheadMs: 0,
+      renderJob: undefined,
+      importProgressByAssetId: {},
+      twickTimelineJson: null,
+      errorMessage: undefined,
+      statusMessage: undefined,
+    });
+  },
 
   startRender: async (settings) => {
     const currentProject = get().currentProject;

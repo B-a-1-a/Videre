@@ -47,30 +47,27 @@ export function TwickEditor() {
     [currentProject, saveTwickTimeline],
   );
 
-  if (!currentProject) {
-    return (
-      <div className="twick-placeholder">
-        <span className="muted">Open a project to start editing.</span>
-      </div>
-    );
-  }
+  if (!currentProject) return null;
 
   return (
+    // twick-fill ensures the studio fills the parent container
     // key ensures TwickStudio fully remounts (with fresh providers) when project changes
-    <LivePlayerProvider key={currentProject.id}>
-      <TimelineProvider
-        contextId={currentProject.id}
-        initialData={initialData}
-        analytics={{ enabled: false }}
-      >
-        <TwickBridge />
-        <TwickStudio
-          studioConfig={{
-            videoProps: { width: 1920, height: 1080 },
-            saveProject: handleSaveProject,
-          }}
-        />
-      </TimelineProvider>
-    </LivePlayerProvider>
+    <div className="twick-fill">
+      <LivePlayerProvider key={currentProject.id}>
+        <TimelineProvider
+          contextId={currentProject.id}
+          initialData={initialData}
+          analytics={{ enabled: false }}
+        >
+          <TwickBridge />
+          <TwickStudio
+            studioConfig={{
+              videoProps: { width: 1920, height: 1080 },
+              saveProject: handleSaveProject,
+            }}
+          />
+        </TimelineProvider>
+      </LivePlayerProvider>
+    </div>
   );
 }
