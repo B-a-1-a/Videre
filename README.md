@@ -1,161 +1,71 @@
-# Videre (Tauri v2)
+# Videre (Electron Local Desktop)
 
-Videre is a local-first desktop video editor built with Tauri + React + TypeScript.
+Videre is an Electron desktop video editor running fully local without
+auth/cloud dependencies.
 
-## Current Status (Klyp Cutover)
+## What Changed
 
-- The frontend now runs on route-based navigation with:
-  - `/` landing (Videre home flow)
-  - `/projects` dashboard
-  - `/project/:id` editor
-  - `/profile` local profile view
-- A desktop adapter layer is available at `src/app/lib/desktopApi.ts` for project/media/render/analysis operations.
-- The app remains local-first (no cloud auth backend).
-- Project compatibility is hard-reset oriented for the new canonical state fields.
-- Dev/export note: a Remotion capability probe is exposed, while production bundles still require explicit render runtime setup.
+- Tauri runtime removed.
+- Frontend moved to a React Router app (`/app`).
+- Authentication removed (local single-user mode).
+- Project persistence moved to local filesystem JSON storage.
+- Media upload/render is local-only via the bundled Remotion/Express server.
 
-## Implemented in this baseline
+## Local Data Paths
 
-- Local project lifecycle:
-  - Create project folders
-  - Open project folders
-  - Save and list recent projects
-- Managed project structure:
-  - `project.db`
-  - `media/originals`
-  - `media/proxies`
-  - `media/waveforms`
-  - `exports`
-- Media import pipeline:
-  - Copy imported files into managed storage (hash-based naming)
-  - Probe metadata with FFprobe
-  - Background proxy and waveform generation
-- Timeline engine:
-  - Multi-track model (`video` + `audio`)
-  - Add/remove/reorder tracks
-  - Add/move/trim/split/delete clips
-- Render pipeline:
-  - Background render jobs
-  - MP4 output (`libx264` + `aac`, `yuv420p`)
-  - Cancel render jobs
-- AI scaffolding only:
-  - Stub tables and `analysis_enqueue_stub` command (returns not implemented)
+- Projects index: `local_data/projects.json`
+- Project state files: `local_data/project_state/<project-id>.json`
+- Imported media + rendered outputs: `out/`
 
-## Architecture
+You can override paths with:
 
-- Frontend: React + TypeScript + Zustand
-- Backend: Rust + Tauri commands
-- Persistence: SQLite (`rusqlite`)
-- Media tooling: FFmpeg / FFprobe sidecars (with dev fallback to system binaries)
+- `VIDERE_DATA_DIR`
+- `VIDERE_MEDIA_DIR`
+- `TIMELINE_DIR`
 
-## Getting started
+## Development
 
 ### Prerequisites
 
-- Node.js `>=20.19` or `>=22.12` (Vite 7 requirement)
-- `pnpm` 10+
-- Rust toolchain (`rustup`, `cargo`)
+- Node.js 20+
+- `pnpm`
 
-### Desktop startup (recommended)
+### Start Desktop App
+
+```bash
+pnpm install
+pnpm desktop:dev
+```
+
+This starts:
+
+- React Router dev server on `http://127.0.0.1:5173`
+- Local render/upload server on `http://127.0.0.1:8000`
+- Electron window loading the app
+
+Shortcut:
 
 ```bash
 ./scripts/start-dev.sh
 ```
 
-This is the recommended way to run the app locally because it follows the full Tauri desktop flow:
+## Scripts
 
-- Installs JS dependencies
-- Fetches FFmpeg/FFprobe sidecars
-- Builds frontend assets
-- Starts `pnpm tauri dev`
+- `pnpm dev` - React Router dev server
+- `pnpm render:server` - Remotion render/upload server
+- `pnpm desktop:dev` - Full desktop dev stack (web + render + Electron)
+- `pnpm build` - React Router production build
+- `pnpm preview` - Serve production build locally
+- `pnpm typecheck` - Type generation + TypeScript checks
+- `pnpm lint` - ESLint checks
 
-Optional flags:
+## Notes
 
-- `./scripts/start-dev.sh --all-sidecars`
-- `./scripts/start-dev.sh --skip-build`
+- No login/session setup is required.
+- Storage/account views now report local disk usage.
+- All imported videos/images/audio remain on local disk.
 
-### Manual desktop startup commands
+## Python Labs (unchanged)
 
-Use this if you prefer to run each step explicitly:
-
-```bash
-pnpm install
-pnpm sidecars:fetch
-pnpm build
-pnpm tauri dev
-```
-
-To fetch sidecars for all configured targets:
-
-```bash
-pnpm sidecars:fetch -- --all
-```
-
-### Important
-
-For full desktop behavior (filesystem dialogs, sidecars, Tauri IPC), run via `pnpm tauri dev` or `./scripts/start-dev.sh`.  
-`pnpm dev` (Vite-only) does not provide the full desktop runtime.
-
-## Production bundling
-
-Default build target is `.app` on macOS:
-
-```bash
-pnpm tauri build
-```
-
-To explicitly request DMG packaging:
-
-```bash
-pnpm tauri build --bundles dmg
-```
-
-Note: DMG creation uses `hdiutil` and Finder automation and can fail in sandboxed/headless environments.
-
-## IPC commands
-
-- `project_create(name, location)`
-- `project_open(project_root)`
-- `project_save(project_id)`
-- `project_list_recent()`
-- `project_delete(project_id)`
-- `media_import(project_id, source_paths)`
-- `media_remove(project_id, asset_id)`
-- `timeline_get(project_id)`
-- `timeline_apply_patch(project_id, patch)`
-- `render_start(project_id, settings)`
-- `render_status(project_id, job_id)`
-- `render_cancel(project_id, job_id)`
-- `analysis_enqueue_stub(project_id, job_kind)`
-
-## CI
-
-A GitHub Actions workflow is included at `.github/workflows/ci.yml` for:
-
-- Type checks
-- Rust fmt/clippy/tests
-- Cargo + npm audits
-- macOS and Windows matrix runs
-
-## Standalone Nexa Caption Lab
-
-For isolated Python-based ASR captioning experiments (no Tauri integration), use:
-
-- `/Users/bala/Repos/Videre/nexa-caption-lab`
-
-See `/Users/bala/Repos/Videre/nexa-caption-lab/README.md` for setup and CLI usage.
-
-## Standalone Nexa Video Context Lab
-
-For isolated Python-based video context workflows with timestamp sections (`find`, `select-part`, `clip`), use:
-
-- `/Users/bala/Repos/Videre/nexa-video-context-lab`
-
-See `/Users/bala/Repos/Videre/nexa-video-context-lab/README.md` for setup and CLI usage.
-
-## Security notes
-
-- Path handling is constrained to opened project roots.
-- Imported media is canonicalized and copied into managed project storage.
-- Render output file names are sanitized to prevent traversal.
-- Tauri capability permissions are limited to defaults + dialog + opener.
+- `nexa-caption-lab/`
+- `nexa-video-context-lab/`

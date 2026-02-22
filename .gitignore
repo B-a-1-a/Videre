@@ -8,8 +8,12 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.react-router
 dist
 dist-ssr
+build
+out
+local_data
 *.local
 src-tauri/target
 src-tauri/gen
@@ -29,4 +33,3 @@ src-tauri/binaries/*
 *.njsproj
 *.sln
 *.sw?
-

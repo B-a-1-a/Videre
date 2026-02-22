@@ -1,9 +1,0 @@
-export const SNAP_MS = 10;
-export const MIN_CLIP_WIDTH_PX = 8;
-export const TRACK_HEIGHT_PX = 48;
-export const TRACK_HEADER_WIDTH_PX = 120;
-export const RULER_HEIGHT_PX = 28;
-export const MIN_ZOOM_PX_PER_SEC = 20;
-export const MAX_ZOOM_PX_PER_SEC = 500;
-export const DEFAULT_ZOOM_PX_PER_SEC = 100;
-export const PLAYHEAD_ADVANCE_MS = 1000; // arrow key step
