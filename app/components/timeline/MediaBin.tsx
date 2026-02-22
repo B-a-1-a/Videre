@@ -55,6 +55,7 @@ export interface MediaBinProps {
   handleDeleteFromContext: () => Promise<void>;
   handleSplitAudioFromContext: () => Promise<void>;
   handleCloseContextMenu: () => void;
+  onAddMediaClick?: () => void;
 }
 
 interface MediaBinViewProps extends MediaBinProps {
@@ -249,6 +250,7 @@ export function MediaBinView({
   handleDeleteFromContext,
   handleSplitAudioFromContext,
   handleCloseContextMenu,
+  onAddMediaClick,
   itemLayout = "list",
 }: MediaBinViewProps) {
 
@@ -534,7 +536,7 @@ export function MediaBinView({
     >
       {/* Compact Header */}
       <div className="p-2 border-b border-border/50">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <h3 className="text-xs font-medium text-foreground">
               Media Library
@@ -544,6 +546,16 @@ export function MediaBinView({
             </Badge>
           </div>
           <div className="flex items-center gap-1.5">
+            {/* New Add Assets Button */}
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onAddMediaClick}
+              className="h-6 px-2 text-xs"
+            >
+              <Upload className="h-3 w-3 mr-1" />
+              Add Assets
+            </Button>
             {/* Arrange segmented switch - subtle, no gray bg */}
             <div className="flex items-center gap-0.5 rounded-md border border-border/30 p-0.5">
               <Button

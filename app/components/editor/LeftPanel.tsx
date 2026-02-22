@@ -43,6 +43,7 @@ interface LeftPanelProps {
     request: GenerateClipCaptionsRequest
   ) => GenerateClipCaptionsResult;
   projectId?: string;
+  onAddMediaClick?: () => void;
 }
 
 export default function LeftPanel({
@@ -62,6 +63,7 @@ export default function LeftPanel({
   onApplyTranscriptEdit,
   onGenerateClipCaptions,
   projectId,
+  onAddMediaClick,
 }: LeftPanelProps) {
   const location = useLocation();
 
@@ -98,6 +100,7 @@ export default function LeftPanel({
               onApplyTranscriptEdit,
               onGenerateClipCaptions,
               projectId,
+              onAddMediaClick,
             }}
           />
         </div>

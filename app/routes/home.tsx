@@ -1030,7 +1030,7 @@ export default function TimelineEditor() {
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Save / Import / Export */}
+          {/* Save */}
           <Button
             variant="ghost"
             size="sm"
@@ -1041,25 +1041,10 @@ export default function TimelineEditor() {
             Save
           </Button>
 
-          <Button variant="ghost" size="sm" onClick={handleAddMediaClick} className="h-7 px-2 text-xs">
-            <Upload className="h-3 w-3 mr-1" />
-            Import
-          </Button>
-
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleRenderClick}
-            disabled={isRendering}
-            className="h-7 px-2 text-xs">
-            <Download className="h-3 w-3 mr-1" />
-            {isRendering ? "Rendering..." : "Export"}
-          </Button>
-
           {/* Theme Switcher */}
           <Button
             variant="ghost"
-            size="icon"
+            size="sm"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             className="h-7 w-7 text-muted-foreground hover:text-foreground"
             title="Switch Theme"
@@ -1091,6 +1076,7 @@ export default function TimelineEditor() {
               onApplyTranscriptEdit={handleApplyTranscriptEdit}
               onGenerateClipCaptions={handleGenerateClipCaptions}
               projectId={projectId}
+              onAddMediaClick={handleAddMediaClick}
             />
           </div>
         </ResizablePanel>
@@ -1359,8 +1345,9 @@ export default function TimelineEditor() {
                 </div>
               </div>
             ) : (
-              <div className="h-full min-h-0">
+              <div className="h-full min-h-0 flex flex-col">
                 <ChatBox
+                  className="flex-1 min-h-0"
                   mediaBinItems={mediaBinItems}
                   handleDropOnTrack={handleDropOnTrackWithAutoTranscribe}
                   isMinimized={false}
@@ -1371,6 +1358,18 @@ export default function TimelineEditor() {
                   handleUpdateScrubber={handleUpdateScrubberWithLocking}
                   handleDeleteScrubber={handleDeleteScrubber}
                 />
+                <div className="p-3 border-t border-border bg-background mt-auto">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleRenderClick}
+                    disabled={isRendering}
+                    className="w-full h-9 font-medium"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {isRendering ? "Rendering..." : "Export"}
+                  </Button>
+                </div>
               </div>
             )}
           </div>
