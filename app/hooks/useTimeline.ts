@@ -1135,42 +1135,18 @@ export const useTimeline = () => {
         };
       }
 
-      const sequencedSegments: Array<{
-        text: string;
-        words?: { text: string; start: number; end: number }[];
-        startSec: number;
-        endSec: number;
-      }> = [];
-      let previousEnd = clipStartSec;
-      for (const segment of sanitizedSegments) {
-        const startSec = Math.max(segment.startSec, previousEnd);
-        const endSec = Math.max(startSec + minDurationSec, segment.endSec);
-        if (endSec > clipEndSec) {
-          continue;
-        }
-        sequencedSegments.push({
-          text: segment.text,
-          words: segment.words,
-          startSec,
-          endSec,
-        });
-        previousEnd = endSec;
-      }
-
-      if (sequencedSegments.length === 0) {
-        return {
-          success: false,
-          referenceScrubberId: request.referenceScrubberId,
-          captionTrackId: null,
-          createdScrubberIds: [],
-          error: "Caption segments collapsed after timeline alignment.",
-        };
-      }
-
       const fontSizeRaw = Number(request.textStyle.fontSize);
-      const fontSize = Number.isFinite(fontSizeRaw)
+      const baseFontSize = Number.isFinite(fontSizeRaw)
         ? Math.max(12, Math.min(220, Math.round(fontSizeRaw)))
         : 56;
+      const autoFitMinFontSize = Math.max(
+        12,
+        Math.min(220, Math.round(baseFontSize * 0.6))
+      );
+      const autoFitMaxFontSize = Math.max(
+        autoFitMinFontSize,
+        Math.min(220, Math.round(baseFontSize * 1.35))
+      );
       const fontFamily = String(request.textStyle.fontFamily || "").trim() ||
         "Inter, ui-sans-serif, system-ui, sans-serif";
       const color = /^#[0-9A-F]{6}$/i.test(String(request.textStyle.color || "").trim())
@@ -1195,7 +1171,10 @@ export const useTimeline = () => {
           ? referenceScrubber.media_height
           : 1080;
       const captionWidthPlayer = Math.max(320, Math.round(frameWidth * 0.84));
-      const captionHeightPlayer = Math.max(96, Math.round(fontSize * 2));
+      const captionHeightPlayer = Math.max(
+        96,
+        Math.round(autoFitMaxFontSize * 2.2)
+      );
       const captionLeftPlayer = Math.max(
         0,
         Math.round((frameWidth - captionWidthPlayer) / 2)
@@ -1212,16 +1191,57 @@ export const useTimeline = () => {
       const pixelsPerSecond = getPixelsPerSecond();
       const captionTrackId = `caption-track-${request.referenceScrubberId}`;
       const captionSourceMediaBinId = `caption-source-${request.referenceScrubberId}`;
-      const captionScrubbers: ScrubberState[] = sequencedSegments.map(
+      const estimateSegmentFontSize = (segmentText: string, wordCount: number): number => {
+        const normalizedText = segmentText.replace(/\s+/g, " ").trim();
+        const textLength = Math.max(1, normalizedText.length);
+        const preferredLines = textLength > 54 ? 3 : textLength > 24 ? 2 : 1;
+        const charsPerLine = Math.max(8, Math.ceil(textLength / preferredLines));
+        const widthBudget = Math.max(1, captionWidthPlayer - 64);
+        const heightBudget = Math.max(1, captionHeightPlayer - 40);
+        const widthDrivenSize = Math.floor(widthBudget / (charsPerLine * 0.56));
+        const heightDrivenSize = Math.floor(heightBudget / (preferredLines * 1.25));
+        const crowdingFactor = wordCount > 10 ? 0.9 : 1;
+        const candidate = Math.floor(
+          Math.min(widthDrivenSize, heightDrivenSize, autoFitMaxFontSize) * crowdingFactor
+        );
+        return Math.max(autoFitMinFontSize, Math.min(autoFitMaxFontSize, candidate));
+      };
+      const captionScrubbers: ScrubberState[] = sanitizedSegments.map(
         (segment, index) => {
           const durationSec = Math.max(minDurationSec, segment.endSec - segment.startSec);
           const relativeStartSec = Math.max(0, segment.startSec - clipStartSec);
           const width = Math.max(durationSec * pixelsPerSecond, pixelsPerSecond / FPS);
+          const normalizedWords = (segment.words || [])
+            .map((word) => ({
+              text: String(word.text || "").trim(),
+              start: Number(word.start),
+              end: Number(word.end),
+            }))
+            .filter(
+              (word) =>
+                word.text.length > 0 &&
+                Number.isFinite(word.start) &&
+                Number.isFinite(word.end)
+            )
+            .map((word) => ({
+              ...word,
+              start: Math.max(0, Math.min(durationSec, word.start - segment.startSec)),
+              end: Math.max(0, Math.min(durationSec, word.end - segment.startSec)),
+            }))
+            .filter((word) => word.end > word.start)
+            .sort((a, b) => a.start - b.start);
+          const segmentFontSize = estimateSegmentFontSize(
+            segment.text,
+            normalizedWords.length
+          );
           const estimatedTextWidth = Math.max(
             320,
-            Math.round(segment.text.length * Math.max(18, fontSize) * 0.52)
+            Math.round(segment.text.length * Math.max(18, segmentFontSize) * 0.52)
           );
-          const estimatedTextHeight = Math.max(90, Math.round(fontSize * 1.8));
+          const estimatedTextHeight = Math.max(
+            90,
+            Math.round(segmentFontSize * 1.8)
+          );
 
           return {
             id: generateUUID(),
@@ -1238,13 +1258,13 @@ export const useTimeline = () => {
             media_height: estimatedTextHeight,
             text: {
               textContent: segment.text,
-              fontSize,
+              fontSize: segmentFontSize,
               fontFamily,
               color,
               textAlign,
               fontWeight,
               template: request.textStyle.template || null,
-              words: segment.words,
+              words: normalizedWords.length > 0 ? normalizedWords : undefined,
             },
             groupped_scrubbers: null,
             sourceMediaBinId: captionSourceMediaBinId,
