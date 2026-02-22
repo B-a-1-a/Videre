@@ -291,7 +291,7 @@ export function TimelineComposition({
 
         for (let j = 0; j < groupedScrubbers.length; j++) {
           const grouppedScrubber = groupedScrubbers[j];
-          
+
           // Add left transition for the first grouped scrubber
           if (j === 0 && grouppedScrubber.left_transition_id && allTransitions[grouppedScrubber.left_transition_id]) {
             const transition = allTransitions[grouppedScrubber.left_transition_id];
@@ -521,9 +521,9 @@ export function VideoPlayer({
 
   // Guard against invalid dimensions (e.g., user typed 0, only-audio timelines)
   const safeWidth =
-    !compositionWidth || compositionWidth <= 0 ? 1920 : compositionWidth;
+    Math.round(!compositionWidth || compositionWidth <= 0 ? 1920 : compositionWidth);
   const safeHeight =
-    !compositionHeight || compositionHeight <= 0 ? 1080 : compositionHeight;
+    Math.round(!compositionHeight || compositionHeight <= 0 ? 1080 : compositionHeight);
   const safeDuration = Math.max(1, durationInFrames || 1);
 
   return (

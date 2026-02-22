@@ -210,7 +210,6 @@ export default function Captions() {
   } = useOutletContext<CaptionsContext>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingIds, setPendingIds] = useState<string[]>([]);
-  const [useLegacyWhisper, setUseLegacyWhisper] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<{ scrubberId: string, suggestions: AnalysisSuggestion[] } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -248,7 +247,11 @@ export default function Captions() {
         if (Object.prototype.hasOwnProperty.call(prev, scrubberId)) {
           next[scrubberId] = prev[scrubberId];
         } else {
-          next[scrubberId] = record.text;
+          let initialText = record.text;
+          if (!initialText && record.words && record.words.length > 0) {
+            initialText = record.words.map(w => w.text).join(" ").replace(/\s+/g, " ").trim();
+          }
+          next[scrubberId] = initialText;
           changed = true;
         }
       }
@@ -317,7 +320,6 @@ export default function Captions() {
             model: "openai/whisper-small",
             timestamps: "word",
             clips: jobs,
-            useLegacyWhisper,
           }),
         });
 
@@ -367,7 +369,7 @@ export default function Captions() {
         setPendingIds([]);
       }
     },
-    [isSubmitting, onClipTranscriptsChange, projectId, timeline, useLegacyWhisper]
+    [isSubmitting, onClipTranscriptsChange, projectId, timeline]
   );
 
   const handleAnalyzeClips = useCallback(async (scrubberId: string) => {
@@ -547,19 +549,6 @@ export default function Captions() {
           </Button>
         </div>
       </div>
-      <div className="px-2 py-1 border-b border-border/30 flex items-center gap-2">
-        <Switch
-          id="use-legacy-whisper"
-          checked={useLegacyWhisper}
-          onCheckedChange={setUseLegacyWhisper}
-        />
-        <Label
-          htmlFor="use-legacy-whisper"
-          className="text-[10px] text-muted-foreground cursor-pointer"
-        >
-          Use legacy Whisper (transformers) for testing
-        </Label>
-      </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto panel-scrollbar p-2 space-y-2">
         {selectedScrubbers.length === 0 && (
@@ -618,8 +607,12 @@ export default function Captions() {
               {transcriptDisplayIds.map((scrubberId) => {
                 const record = clipTranscripts[scrubberId];
                 if (!record) return null;
-                const editedText = "tomorrow will be a good day";
-                const hasEdits = false;
+                let defaultText = record.text;
+                if (!defaultText && record.words && record.words.length > 0) {
+                  defaultText = record.words.map(w => w.text).join(" ").replace(/\s+/g, " ").trim();
+                }
+                const editedText = editedTranscriptById[scrubberId] ?? defaultText ?? "";
+                const hasEdits = editedText.trim() !== (defaultText || "").trim();
                 const hasWordTimestamps =
                   Array.isArray(record.words) && record.words.length > 0;
                 const keptWordIndexSet = hasWordTimestamps
@@ -674,6 +667,48 @@ export default function Captions() {
 
                     {!record.error ? (
                       <>
+                        <div className="mt-2">
+                          <p className="text-[10px] text-muted-foreground mb-1">
+                            Editable Transcript
+                          </p>
+                          <textarea
+                            value={editedText}
+                            onChange={(event) =>
+                              handleEditedTranscriptChange(
+                                scrubberId,
+                                event.target.value
+                              )
+                            }
+                            rows={4}
+                            className="w-full rounded border border-border/50 bg-background p-2 text-xs leading-relaxed resize-y min-h-20"
+                            spellCheck={false}
+                          />
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            Keep words you want. Deleted words are shown with strikethrough until you apply.
+                          </p>
+                          <div className="mt-2 flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => handleResetEditedTranscript({ ...record, text: defaultText })}
+                              disabled={!hasEdits}
+                            >
+                              Reset
+                            </Button>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() =>
+                                handleApplyEditedTranscript(record.scrubberId)
+                              }
+                              disabled={!hasWordTimestamps}
+                            >
+                              Apply Edit Cut
+                            </Button>
+                          </div>
+                        </div>
                         {hasWordTimestamps && !unavailableMessage && (
                           <div className="mt-2 rounded border border-border/40 bg-background p-2">
                             <p className="text-[10px] text-muted-foreground mb-1">
