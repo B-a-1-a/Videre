@@ -27,6 +27,7 @@ import {
   TRANSCRIPT_UNAVAILABLE_MESSAGE,
   type TranscribeClipJob,
 } from "~/lib/clip-transcription";
+import { cn } from "~/lib/utils";
 
 export function loader() {
   return null;
@@ -63,36 +64,36 @@ function tokenizeEditedTranscript(value: string): string[] {
     .filter((token) => token.length > 0);
 }
 
-function transcriptWordsToSegments(
+function isValidTranscriptWord(
+  word: ClipTranscriptRecord["words"][number]
+): boolean {
+  return (
+    typeof word.text === "string" &&
+    word.text.trim().length > 0 &&
+    Number.isFinite(word.start) &&
+    Number.isFinite(word.end) &&
+    word.end > word.start
+  );
+}
+
+function getKeptWordIndexSet(
   record: ClipTranscriptRecord,
   editedText: string
-): ClipTranscriptSegment[] {
-  if (!record.words.length) return [];
-
-  const originalWords = record.words.filter((word) => {
-    return (
-      typeof word.text === "string" &&
-      word.text.trim().length > 0 &&
-      Number.isFinite(word.start) &&
-      Number.isFinite(word.end) &&
-      word.end > word.start
-    );
-  });
-  if (originalWords.length === 0) return [];
-
-  const originalTokens = originalWords
+): Set<number> {
+  const originalTokens = record.words
     .map((word, index) => ({
       originalIndex: index,
       token: normalizeToken(word.text),
+      valid: isValidTranscriptWord(word),
     }))
-    .filter((item) => item.token.length > 0);
+    .filter((item) => item.valid && item.token.length > 0);
 
-  if (originalTokens.length === 0) return [];
+  if (originalTokens.length === 0) return new Set<number>();
 
   const editedTokens = tokenizeEditedTranscript(editedText);
-  if (editedTokens.length === 0) return [];
+  if (editedTokens.length === 0) return new Set<number>();
 
-  const keptWordIndices: number[] = [];
+  const keptWordIndices = new Set<number>();
   let searchFrom = 0;
   for (const editedToken of editedTokens) {
     let found = -1;
@@ -103,30 +104,44 @@ function transcriptWordsToSegments(
       }
     }
     if (found < 0) continue;
-    keptWordIndices.push(originalTokens[found].originalIndex);
+    keptWordIndices.add(originalTokens[found].originalIndex);
     searchFrom = found + 1;
   }
+  return keptWordIndices;
+}
 
-  if (keptWordIndices.length === 0) return [];
+function transcriptWordsToSegments(
+  record: ClipTranscriptRecord,
+  editedText: string
+): ClipTranscriptSegment[] {
+  if (!record.words.length) return [];
 
-  const ranges: Array<{ start: number; end: number }> = [];
-  let rangeStart = keptWordIndices[0];
-  let previous = keptWordIndices[0];
-  for (let i = 1; i < keptWordIndices.length; i++) {
-    const current = keptWordIndices[i];
-    if (current === previous + 1) {
-      previous = current;
+  const keptWordIndexSet = getKeptWordIndexSet(record, editedText);
+  if (keptWordIndexSet.size === 0) return [];
+
+  const keptEntries = record.words
+    .map((word, index) => ({ word, index }))
+    .filter((entry) => isValidTranscriptWord(entry.word) && keptWordIndexSet.has(entry.index));
+  if (keptEntries.length === 0) return [];
+
+  const groups: Array<Array<{ word: ClipTranscriptRecord["words"][number]; index: number }>> = [];
+  for (const entry of keptEntries) {
+    const lastGroup = groups[groups.length - 1];
+    if (!lastGroup) {
+      groups.push([entry]);
       continue;
     }
-    ranges.push({ start: rangeStart, end: previous });
-    rangeStart = current;
-    previous = current;
+    const previous = lastGroup[lastGroup.length - 1];
+    if (entry.index === previous.index + 1) {
+      lastGroup.push(entry);
+      continue;
+    }
+    groups.push([entry]);
   }
-  ranges.push({ start: rangeStart, end: previous });
 
-  return ranges
-    .map((range) => {
-      const words = originalWords.slice(range.start, range.end + 1);
+  return groups
+    .map((group) => {
+      const words = group.map((entry) => entry.word);
       if (!words.length) return null;
       const startSec = words[0].start;
       const endSec = words[words.length - 1].end;
@@ -500,6 +515,14 @@ export default function Captions() {
                 const hasEdits = editedText.trim() !== (record.text || "").trim();
                 const hasWordTimestamps =
                   Array.isArray(record.words) && record.words.length > 0;
+                const keptWordIndexSet = hasWordTimestamps
+                  ? getKeptWordIndexSet(record, editedText)
+                  : new Set<number>();
+                const validWordCount = hasWordTimestamps
+                  ? record.words.filter((word) => isValidTranscriptWord(word)).length
+                  : 0;
+                const hasPendingCutWords =
+                  hasWordTimestamps && keptWordIndexSet.size < validWordCount;
                 const unavailableMessage = record.error ||
                   (hasWordTimestamps ? null : TRANSCRIPT_UNAVAILABLE_MESSAGE);
                 const clipDuration = Math.max(
@@ -548,7 +571,7 @@ export default function Captions() {
                             spellCheck={false}
                           />
                           <p className="text-[10px] text-muted-foreground mt-1">
-                            Keep words you want. Removed words are cut out of the clip.
+                            Keep words you want. Deleted words are shown with strikethrough until you apply.
                           </p>
                           <div className="mt-2 flex items-center gap-1">
                             <Button
@@ -574,18 +597,54 @@ export default function Captions() {
                           </div>
                         </div>
                         {hasWordTimestamps && !unavailableMessage && (
+                          <div className="mt-2 rounded border border-border/40 bg-background p-2">
+                            <p className="text-[10px] text-muted-foreground mb-1">
+                              Pending Cut Preview
+                              {hasPendingCutWords ? "" : " (no deletions)"}
+                            </p>
+                            <p className="text-xs leading-relaxed">
+                              {record.words.map((word, index) => {
+                                const isRemoved =
+                                  isValidTranscriptWord(word) &&
+                                  !keptWordIndexSet.has(index);
+                                return (
+                                  <span
+                                    key={`${record.scrubberId}-preview-${word.start}-${word.end}-${word.text}`}
+                                    className={cn(
+                                      "mr-1",
+                                      isRemoved
+                                        ? "line-through text-destructive/80"
+                                        : "text-foreground"
+                                    )}
+                                  >
+                                    {word.text}
+                                  </span>
+                                );
+                              })}
+                            </p>
+                          </div>
+                        )}
+                        {hasWordTimestamps && !unavailableMessage && (
                           <div className="mt-2 grid grid-cols-[minmax(0,1fr)_44px] gap-2 items-start">
                             <div className="rounded border border-border/40 bg-background p-2 max-h-36 overflow-y-auto panel-scrollbar">
                               <p className="text-[10px] text-muted-foreground mb-1">Word Timestamps</p>
                               <div className="flex flex-wrap gap-1">
-                                {record.words.map((word) => (
-                                  <span
-                                    key={`${record.scrubberId}-${word.start}-${word.end}-${word.text}`}
-                                    className="text-[10px] px-1.5 py-0.5 rounded bg-muted font-mono"
-                                  >
-                                    {word.text} [{word.start.toFixed(2)}-{word.end.toFixed(2)}]
-                                  </span>
-                                ))}
+                                {record.words.map((word, index) => {
+                                  const isRemoved =
+                                    isValidTranscriptWord(word) &&
+                                    !keptWordIndexSet.has(index);
+                                  return (
+                                    <span
+                                      key={`${record.scrubberId}-${word.start}-${word.end}-${word.text}`}
+                                      className={cn(
+                                        "text-[10px] px-1.5 py-0.5 rounded bg-muted font-mono",
+                                        isRemoved && "line-through text-destructive/80"
+                                      )}
+                                    >
+                                      {word.text} [{word.start.toFixed(2)}-{word.end.toFixed(2)}]
+                                    </span>
+                                  );
+                                })}
                               </div>
                             </div>
                             <div className="rounded border border-border/40 bg-background p-1">
@@ -594,16 +653,22 @@ export default function Captions() {
                               </p>
                               <div className="relative h-32 my-1">
                                 <div className="absolute left-1/2 top-0 bottom-0 w-px bg-border/90" />
-                                {record.words.map((word) => {
+                                {record.words.map((word, index) => {
                                   const relative = clamp(
                                     (word.start - record.clipStartSec) / clipDuration,
                                     0,
                                     1
                                   );
+                                  const isRemoved =
+                                    isValidTranscriptWord(word) &&
+                                    !keptWordIndexSet.has(index);
                                   return (
                                     <span
                                       key={`${record.scrubberId}-rail-${word.start}-${word.end}-${word.text}`}
-                                      className="absolute left-1/2 h-0.5 w-3 -translate-x-1/2 -translate-y-1/2 rounded bg-primary/80"
+                                      className={cn(
+                                        "absolute left-1/2 h-0.5 w-3 -translate-x-1/2 -translate-y-1/2 rounded",
+                                        isRemoved ? "bg-destructive/80" : "bg-primary/80"
+                                      )}
                                       style={{ top: `${relative * 100}%` }}
                                       title={`${word.text} ${word.start.toFixed(2)}s`}
                                     />
