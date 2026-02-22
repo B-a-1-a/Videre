@@ -44,7 +44,7 @@ interface ChatBoxProps {
     item: MediaBinItem,
     trackId: string,
     dropLeftPx: number
-  ) => void;
+  ) => { scrubberId: string } | null;
   isMinimized?: boolean;
   onToggleMinimize?: () => void;
   messages: Message[];

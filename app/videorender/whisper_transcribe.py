@@ -6,7 +6,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 SETUP_HINT = (
     "Install dependencies in a Python 3.12 venv: "
@@ -39,24 +39,58 @@ def to_int(value: Any, default: int = 0) -> int:
     return default
 
 
-def resolve_device(raw_device: str) -> int:
-    try:
-        import torch
-    except Exception:
-        torch = None  # type: ignore[assignment]
-
+def resolve_device(raw_device: str) -> tuple[str, int]:
     device = (raw_device or "auto").strip().lower()
     if device == "auto":
-        if torch is not None and torch.cuda.is_available():
-            return 0
-        return -1
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                return ("cuda", 0)
+        except Exception:
+            pass
+        return ("cpu", 0)
     if device in {"cpu", "-1"}:
-        return -1
+        return ("cpu", 0)
     if device.startswith("cuda"):
         if ":" in device:
-            return to_int(device.split(":", 1)[1], default=0)
-        return 0
-    return to_int(device, default=-1)
+            return ("cuda", max(0, to_int(device.split(":", 1)[1], default=0)))
+        return ("cuda", 0)
+    parsed = to_int(device, default=-1)
+    if parsed >= 0:
+        return ("cuda", parsed)
+    return ("cpu", 0)
+
+
+def normalize_compute_type(raw_compute_type: Any, device_name: str) -> str:
+    requested = str(raw_compute_type or "").strip().lower()
+    if device_name == "cuda":
+        allowed = {"int8", "int8_float16", "float16", "float32"}
+        default = "int8_float16"
+        if not requested:
+            return default
+        if requested in allowed:
+            return requested
+        if requested == "int8_float32":
+            return "int8"
+        return default
+
+    allowed_cpu = {"int8", "int8_float32", "float32"}
+    default_cpu = "int8"
+    if not requested:
+        return default_cpu
+    if requested in allowed_cpu:
+        return requested
+    if requested in {"float16", "int8_float16"}:
+        return default_cpu
+    return default_cpu
+
+
+def normalize_chunk_seconds(raw_chunk_seconds: Any) -> float:
+    parsed = to_float(raw_chunk_seconds, default=45.0)
+    if parsed <= 0:
+        parsed = 45.0
+    return max(5.0, min(600.0, parsed))
 
 
 def extract_audio_segment(
@@ -93,7 +127,9 @@ def extract_audio_segment(
         raise RuntimeError(detail)
 
 
-def normalize_words(chunks: Any, clip_start_sec: float) -> list[dict[str, float | str]]:
+def normalize_words_from_transformers(
+    chunks: Any, clip_start_sec: float
+) -> list[dict[str, float | str]]:
     if not isinstance(chunks, list):
         return []
 
@@ -121,6 +157,8 @@ def normalize_words(chunks: Any, clip_start_sec: float) -> list[dict[str, float 
 
         if start_val is None or end_val is None:
             continue
+        if end_val < start_val:
+            end_val = start_val
 
         words.append(
             {
@@ -130,6 +168,46 @@ def normalize_words(chunks: Any, clip_start_sec: float) -> list[dict[str, float 
             }
         )
     return words
+
+
+def normalize_words_from_faster_whisper(
+    segments: Iterable[Any],
+    clip_start_sec: float,
+    with_word_timestamps: bool,
+) -> tuple[list[str], list[dict[str, float | str]]]:
+    text_parts: list[str] = []
+    words: list[dict[str, float | str]] = []
+
+    for segment in segments:
+        segment_text = str(getattr(segment, "text", "") or "").strip()
+        if segment_text:
+            text_parts.append(segment_text)
+        if not with_word_timestamps:
+            continue
+
+        segment_words = getattr(segment, "words", None)
+        if segment_words is None:
+            continue
+
+        for word in segment_words:
+            token = str(getattr(word, "word", "") or "").strip()
+            if not token:
+                continue
+            start_val = getattr(word, "start", None)
+            end_val = getattr(word, "end", None)
+            if start_val is None and end_val is None:
+                continue
+            start_num = max(0.0, to_float(start_val, default=0.0))
+            end_num = max(start_num, to_float(end_val, default=start_num))
+            words.append(
+                {
+                    "text": token,
+                    "start": clip_start_sec + start_num,
+                    "end": clip_start_sec + end_num,
+                }
+            )
+
+    return (text_parts, words)
 
 
 def fail_results(jobs: list[dict[str, Any]], message: str) -> list[dict[str, Any]]:
@@ -147,6 +225,86 @@ def fail_results(jobs: list[dict[str, Any]], message: str) -> list[dict[str, Any
             }
         )
     return failed
+
+
+def load_faster_whisper_model(
+    model: str, device_name: str, device_index: int, compute_type: str
+) -> Any:
+    from faster_whisper import WhisperModel
+
+    return WhisperModel(
+        model_size_or_path=model,
+        device=device_name,
+        device_index=device_index,
+        compute_type=compute_type,
+    )
+
+
+def load_transformers_pipeline(
+    model: str, device_name: str, device_index: int, compute_type: str
+) -> Any:
+    import torch
+    from transformers import pipeline
+
+    torch_dtype = torch.float32
+    if device_name == "cuda" and compute_type in {"float16", "int8_float16"}:
+        torch_dtype = torch.float16
+
+    device = device_index if device_name == "cuda" else -1
+    return pipeline(
+        "automatic-speech-recognition",
+        model=model,
+        device=device,
+        torch_dtype=torch_dtype,
+    )
+
+
+def transcribe_chunk_with_faster_whisper(
+    model_runner: Any,
+    audio_path: str,
+    timestamps: str,
+    chunk_start_sec: float,
+) -> tuple[str, list[dict[str, float | str]]]:
+    with_word_timestamps = timestamps == "word"
+    segments, _info = model_runner.transcribe(
+        audio_path,
+        task="transcribe",
+        beam_size=1,
+        best_of=1,
+        temperature=0.0,
+        condition_on_previous_text=False,
+        word_timestamps=with_word_timestamps,
+    )
+    text_parts, words = normalize_words_from_faster_whisper(
+        segments, clip_start_sec=chunk_start_sec, with_word_timestamps=with_word_timestamps
+    )
+    text = " ".join(part for part in text_parts if part).strip()
+    return (text, words)
+
+
+def transcribe_chunk_with_transformers(
+    asr: Any,
+    audio_path: str,
+    timestamps: str,
+    chunk_start_sec: float,
+) -> tuple[str, list[dict[str, float | str]]]:
+    if timestamps == "word":
+        raw_result = asr(audio_path, return_timestamps="word")
+    else:
+        raw_result = asr(audio_path)
+
+    text = ""
+    chunks: Any = []
+    if isinstance(raw_result, dict):
+        text = str(raw_result.get("text") or "").strip()
+        chunks = raw_result.get("chunks")
+    else:
+        text = str(raw_result).strip()
+
+    words = normalize_words_from_transformers(chunks, clip_start_sec=chunk_start_sec)
+    if not text and words:
+        text = " ".join(str(word["text"]) for word in words).strip()
+    return (text, words)
 
 
 def main() -> int:
@@ -168,49 +326,45 @@ def main() -> int:
     model = str(payload.get("model") or "openai/whisper-small")
     timestamps = str(payload.get("timestamps") or "word")
     ffmpeg_bin = str(payload.get("ffmpegBin") or "ffmpeg")
-    device = resolve_device(str(payload.get("device") or "auto"))
+    device_name, device_index = resolve_device(str(payload.get("device") or "auto"))
+    compute_type = normalize_compute_type(payload.get("computeType"), device_name)
+    chunk_seconds = normalize_chunk_seconds(payload.get("chunkSeconds"))
+
+    runner_backend = ""
+    faster_runner: Any | None = None
+    transformers_runner: Any | None = None
+    backend_failures: list[str] = []
 
     try:
-        import torch  # noqa: F401
-    except Exception as exc:
-        print(
-            json.dumps(
-                {"results": fail_results(jobs, f"torch import failed: {exc}. {SETUP_HINT}")}
-            )
-        )
-        return 0
-
-    try:
-        from transformers import pipeline
-    except Exception as exc:
-        print(
-            json.dumps(
-                {
-                    "results": fail_results(
-                        jobs, f"transformers import failed: {exc}. {SETUP_HINT}"
-                    )
-                }
-            )
-        )
-        return 0
-
-    try:
-        asr = pipeline(
-            "automatic-speech-recognition",
+        faster_runner = load_faster_whisper_model(
             model=model,
-            device=device,
+            device_name=device_name,
+            device_index=device_index,
+            compute_type=compute_type,
         )
+        runner_backend = "faster-whisper"
     except Exception as exc:
-        print(
-            json.dumps(
-                {
-                    "results": fail_results(
-                        jobs,
-                        f"Failed to load model '{model}'. Install dependencies and verify model availability. {exc}",
-                    )
-                }
+        backend_failures.append(f"faster-whisper unavailable: {exc}")
+
+    if faster_runner is None:
+        try:
+            transformers_runner = load_transformers_pipeline(
+                model=model,
+                device_name=device_name,
+                device_index=device_index,
+                compute_type=compute_type,
             )
+            runner_backend = "transformers"
+        except Exception as exc:
+            backend_failures.append(f"transformers fallback unavailable: {exc}")
+
+    if faster_runner is None and transformers_runner is None:
+        message = (
+            "Failed to load any Whisper backend. "
+            + " | ".join(backend_failures)
+            + f". {SETUP_HINT}"
         )
+        print(json.dumps({"results": fail_results(jobs, message)}))
         return 0
 
     results: list[dict[str, Any]] = []
@@ -232,35 +386,61 @@ def main() -> int:
             )
             continue
 
-        temp_audio = None
+        text_parts: list[str] = []
+        words: list[dict[str, float | str]] = []
         try:
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-                temp_audio = Path(tmp.name)
+            chunk_start = start_sec
+            while chunk_start < end_sec:
+                chunk_end = min(end_sec, chunk_start + chunk_seconds)
+                if chunk_end <= chunk_start:
+                    chunk_end = min(end_sec, chunk_start + 0.01)
+                if chunk_end <= chunk_start:
+                    break
 
-            extract_audio_segment(
-                ffmpeg_bin=ffmpeg_bin,
-                input_path=input_path,
-                output_path=str(temp_audio),
-                start_sec=start_sec,
-                end_sec=end_sec,
-            )
+                temp_audio = None
+                try:
+                    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                        temp_audio = Path(tmp.name)
 
-            if timestamps == "word":
-                raw_result = asr(str(temp_audio), return_timestamps="word")
-            else:
-                raw_result = asr(str(temp_audio))
+                    extract_audio_segment(
+                        ffmpeg_bin=ffmpeg_bin,
+                        input_path=input_path,
+                        output_path=str(temp_audio),
+                        start_sec=chunk_start,
+                        end_sec=chunk_end,
+                    )
 
-            text = ""
-            chunks: Any = []
-            if isinstance(raw_result, dict):
-                text = str(raw_result.get("text") or "").strip()
-                chunks = raw_result.get("chunks")
-            else:
-                text = str(raw_result).strip()
+                    if faster_runner is not None:
+                        chunk_text, chunk_words = transcribe_chunk_with_faster_whisper(
+                            model_runner=faster_runner,
+                            audio_path=str(temp_audio),
+                            timestamps=timestamps,
+                            chunk_start_sec=chunk_start,
+                        )
+                    else:
+                        chunk_text, chunk_words = transcribe_chunk_with_transformers(
+                            asr=transformers_runner,
+                            audio_path=str(temp_audio),
+                            timestamps=timestamps,
+                            chunk_start_sec=chunk_start,
+                        )
 
-            words = normalize_words(chunks, clip_start_sec=start_sec)
+                    if chunk_text:
+                        text_parts.append(chunk_text)
+                    if chunk_words:
+                        words.extend(chunk_words)
+                finally:
+                    if temp_audio is not None:
+                        try:
+                            temp_audio.unlink(missing_ok=True)
+                        except Exception:
+                            pass
+
+                chunk_start = chunk_end
+
+            text = " ".join(part for part in text_parts if part).strip()
             if not text and words:
-                text = " ".join(word["text"] for word in words).strip()
+                text = " ".join(str(word["text"]) for word in words).strip()
 
             results.append(
                 {
@@ -270,6 +450,9 @@ def main() -> int:
                     "clipStartSec": start_sec,
                     "clipEndSec": end_sec,
                     "error": None,
+                    "backend": runner_backend,
+                    "computeType": compute_type,
+                    "chunkSeconds": chunk_seconds,
                 }
             )
         except Exception as exc:
@@ -281,14 +464,9 @@ def main() -> int:
                     "clipStartSec": start_sec,
                     "clipEndSec": end_sec,
                     "error": str(exc),
+                    "backend": runner_backend or None,
                 }
             )
-        finally:
-            if temp_audio is not None:
-                try:
-                    temp_audio.unlink(missing_ok=True)
-                except Exception:
-                    pass
 
     print(json.dumps({"results": results}))
     return 0

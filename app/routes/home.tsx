@@ -23,7 +23,6 @@ import { VideoPlayer } from "~/video-compositions/VideoPlayer";
 import { RenderStatus } from "~/components/timeline/RenderStatus";
 import { TimelineRuler } from "~/components/timeline/TimelineRuler";
 import { TimelineTracks } from "~/components/timeline/TimelineTracks";
-import { MediaBinView } from "~/components/timeline/MediaBin";
 import { Button } from "~/components/ui/button";
 import { ProfileMenu } from "~/components/ui/ProfileMenu";
 import { Badge } from "~/components/ui/badge";
@@ -51,7 +50,18 @@ import { useNavigate, useParams } from "react-router";
 import { ChatBox } from "~/components/chat/ChatBox";
 import { VidereLogo } from "~/components/ui/VidereLogo";
 import { useAuth } from "~/hooks/useAuth";
-import type { ClipTranscriptsMap } from "~/components/media/captions.types";
+import type {
+  ApplyTranscriptEditRequest,
+  ApplyTranscriptEditResult,
+  ClipTranscriptsMap,
+  GenerateClipCaptionsRequest,
+  GenerateClipCaptionsResult,
+} from "~/components/media/captions.types";
+import {
+  buildTranscribeJobFromScrubber,
+  normalizeClipTranscriptRecord,
+  requestClipTranscription,
+} from "~/lib/clip-transcription";
 import {
   normalizeMediaBinItems,
   reconcileTimelineWithMediaBin,
@@ -74,6 +84,17 @@ const EMPTY_TIMELINE: TimelineState = {
     { id: "track-4", scrubbers: [], transitions: [] },
   ],
 };
+
+function findScrubberById(
+  timeline: TimelineState,
+  scrubberId: string
+) {
+  for (const track of timeline.tracks) {
+    const scrubber = track.scrubbers.find((item) => item.id === scrubberId);
+    if (scrubber) return scrubber;
+  }
+  return null;
+}
 
 export default function TimelineEditor() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -129,6 +150,8 @@ export default function TimelineEditor() {
     handleDeleteScrubbersByMediaBinId,
     handleDropOnTrack,
     handleSplitScrubberAtRuler,
+    handleCutScrubberWithSegments,
+    handleGenerateCaptionsFromTranscript,
     handleZoomIn,
     handleZoomOut,
     handleZoomReset,
@@ -178,11 +201,133 @@ export default function TimelineEditor() {
   } = useRuler(playerRef, timelineWidth, getPixelsPerSecond());
 
   const { isRendering, renderStatus, handleRenderVideo } = useRenderer();
+  const timelineRef = useRef(timeline);
+  const autoTranscribeQueueRef = useRef<string[]>([]);
+  const autoTranscribeMissingRetryRef = useRef<Record<string, number>>({});
+  const isAutoTranscribingRef = useRef(false);
+
+  useEffect(() => {
+    timelineRef.current = timeline;
+  }, [timeline]);
 
   // Wrapper function for transition drop handler to match expected interface
   const handleDropTransitionOnTrackWrapper = (transition: Transition, trackId: string, dropLeftPx: number) => {
     handleAddTransitionToTrack(trackId, transition, dropLeftPx);
   };
+
+  const processAutoTranscribeQueue = useCallback(async () => {
+    if (isAutoTranscribingRef.current) return;
+    isAutoTranscribingRef.current = true;
+
+    try {
+      while (autoTranscribeQueueRef.current.length > 0) {
+        const scrubberId = autoTranscribeQueueRef.current.shift();
+        if (!scrubberId) continue;
+
+        const scrubber = findScrubberById(timelineRef.current, scrubberId);
+        if (!scrubber) {
+          const retryCount =
+            autoTranscribeMissingRetryRef.current[scrubberId] || 0;
+          if (retryCount < 5) {
+            autoTranscribeMissingRetryRef.current[scrubberId] = retryCount + 1;
+            autoTranscribeQueueRef.current.push(scrubberId);
+            await new Promise((resolve) => window.setTimeout(resolve, 120));
+            continue;
+          }
+          delete autoTranscribeMissingRetryRef.current[scrubberId];
+          setClipTranscripts((prev) => ({
+            ...prev,
+            [scrubberId]: normalizeClipTranscriptRecord({
+              scrubberId,
+              scrubber: null,
+              error: "Clip was not found in the timeline.",
+            }),
+          }));
+          continue;
+        }
+
+        delete autoTranscribeMissingRetryRef.current[scrubberId];
+
+        const jobOrError = buildTranscribeJobFromScrubber(scrubber);
+        if ("error" in jobOrError) {
+          setClipTranscripts((prev) => ({
+            ...prev,
+            [scrubberId]: normalizeClipTranscriptRecord({
+              scrubberId,
+              scrubber,
+              error: jobOrError.error,
+            }),
+          }));
+          continue;
+        }
+
+        try {
+          const payload = await requestClipTranscription({
+            projectId,
+            jobs: [jobOrError],
+          });
+          const result = payload.results.find(
+            (item) => item.scrubberId === scrubberId
+          );
+
+          setClipTranscripts((prev) => ({
+            ...prev,
+            [scrubberId]: normalizeClipTranscriptRecord({
+              scrubberId,
+              scrubber,
+              result: result || null,
+              error: result ? null : "No transcription result returned.",
+            }),
+          }));
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Failed to transcribe selected clip.";
+
+          setClipTranscripts((prev) => ({
+            ...prev,
+            [scrubberId]: normalizeClipTranscriptRecord({
+              scrubberId,
+              scrubber,
+              error: message,
+            }),
+          }));
+        }
+      }
+    } finally {
+      isAutoTranscribingRef.current = false;
+      if (autoTranscribeQueueRef.current.length > 0) {
+        window.setTimeout(() => {
+          void processAutoTranscribeQueue();
+        }, 0);
+      }
+    }
+  }, [projectId]);
+
+  const enqueueAutoTranscribe = useCallback(
+    (scrubberId: string) => {
+      if (!scrubberId) return;
+      if (!autoTranscribeQueueRef.current.includes(scrubberId)) {
+        autoTranscribeQueueRef.current.push(scrubberId);
+      }
+      window.setTimeout(() => {
+        void processAutoTranscribeQueue();
+      }, 0);
+    },
+    [processAutoTranscribeQueue]
+  );
+
+  const handleDropOnTrackWithAutoTranscribe = useCallback(
+    (item: MediaBinItem, trackId: string, dropLeftPx: number) => {
+      const created = handleDropOnTrack(item, trackId, dropLeftPx);
+      if (created?.scrubberId) {
+        enqueueAutoTranscribe(created.scrubberId);
+      }
+      return created;
+    },
+    [enqueueAutoTranscribe, handleDropOnTrack]
+  );
 
   // Derived values
   const timelineData = getTimelineData();
@@ -631,6 +776,97 @@ export default function TimelineEditor() {
     setSelectedScrubberIds([]); // Clear selection after moving
   }, [handleMoveGroupToMediaBin, handleAddGroupToMediaBin]);
 
+  const handleApplyTranscriptEdit = useCallback(
+    (request: ApplyTranscriptEditRequest): ApplyTranscriptEditResult => {
+      const scrubberId = request.scrubberId;
+      const targetTranscript = clipTranscripts[scrubberId];
+      const timelineResult = handleCutScrubberWithSegments(
+        scrubberId,
+        request.segments.map((segment) => ({
+          startSec: segment.startSec,
+          endSec: segment.endSec,
+        }))
+      );
+
+      if (!timelineResult.success) {
+        return {
+          success: false,
+          scrubberId,
+          newScrubberIds: [],
+          error: timelineResult.error || "Failed to cut clip from transcript.",
+        };
+      }
+
+      const replacement = timelineResult.newScrubbers;
+      const replacementIds = replacement.map((scrubber) => scrubber.id);
+      const baseName =
+        targetTranscript?.scrubberName ||
+        replacement[0]?.name ||
+        scrubberId;
+      const sourceWords = targetTranscript?.words || [];
+      const now = new Date().toISOString();
+
+      setSelectedScrubberIds((prev) =>
+        prev.flatMap((id) => (id === scrubberId ? replacementIds : [id]))
+      );
+
+      setClipTranscripts((prev) => {
+        const next = { ...prev };
+        delete next[scrubberId];
+
+        for (let index = 0; index < replacement.length; index++) {
+          const scrubber = replacement[index];
+          const clipStartSec = Math.max(0, (scrubber.trimBefore || 0) / FPS);
+          const clipEndSec = Math.max(
+            clipStartSec + 1 / FPS,
+            scrubber.durationInSeconds - (scrubber.trimAfter || 0) / FPS
+          );
+          const words = sourceWords.filter(
+            (word) =>
+              word.start >= clipStartSec - 1 / FPS &&
+              word.end <= clipEndSec + 1 / FPS
+          );
+          const fallbackSegment = request.segments[index];
+          const text = words.length > 0
+            ? words.map((word) => word.text).join(" ")
+            : fallbackSegment?.text || "";
+
+          next[scrubber.id] = {
+            scrubberId: scrubber.id,
+            scrubberName:
+              replacement.length > 1
+                ? `${baseName} (${index + 1}/${replacement.length})`
+                : baseName,
+            mediaType: scrubber.mediaType === "audio" ? "audio" : "video",
+            text: text.trim(),
+            words,
+            clipStartSec,
+            clipEndSec,
+            error: null,
+            updatedAt: now,
+          };
+        }
+
+        return next;
+      });
+
+      return {
+        success: true,
+        scrubberId,
+        newScrubberIds: replacementIds,
+        error: null,
+      };
+    },
+    [clipTranscripts, handleCutScrubberWithSegments]
+  );
+
+  const handleGenerateClipCaptions = useCallback(
+    (request: GenerateClipCaptionsRequest): GenerateClipCaptionsResult => {
+      return handleGenerateCaptionsFromTranscript(request);
+    },
+    [handleGenerateCaptionsFromTranscript]
+  );
+
   const expandTimelineCallback = useCallback(() => {
     return expandTimeline(containerRef);
   }, [expandTimeline]);
@@ -831,6 +1067,8 @@ export default function TimelineEditor() {
               selectedScrubberIds={selectedScrubberIds}
               clipTranscripts={clipTranscripts}
               onClipTranscriptsChange={setClipTranscripts}
+              onApplyTranscriptEdit={handleApplyTranscriptEdit}
+              onGenerateClipCaptions={handleGenerateClipCaptions}
               projectId={projectId}
             />
           </div>
@@ -1063,7 +1301,7 @@ export default function TimelineEditor() {
                   onDeleteTrack={handleDeleteTrack}
                   onUpdateScrubber={handleUpdateScrubberWithLocking}
                   onDeleteScrubber={handleDeleteScrubber}
-                  onDropOnTrack={handleDropOnTrack}
+                  onDropOnTrack={handleDropOnTrackWithAutoTranscribe}
                   onDropTransitionOnTrack={handleDropTransitionOnTrackWrapper}
                   onDeleteTransition={handleDeleteTransition}
                   getAllScrubbers={getAllScrubbers}
@@ -1087,8 +1325,8 @@ export default function TimelineEditor() {
         <ResizablePanel defaultSize={25} minSize={18} maxSize={40}>
           <div className="h-full border-l border-border flex flex-col">
             {isChatMinimized ? (
-              <div className="h-full min-h-0 relative">
-                <div className="absolute top-2 right-2 z-10">
+              <div className="h-full min-h-0 p-3">
+                <div className="h-full rounded-lg border border-border/50 bg-muted/20 flex items-start justify-end p-2">
                   <Button
                     variant="secondary"
                     size="sm"
@@ -1098,54 +1336,21 @@ export default function TimelineEditor() {
                     Open Chat
                   </Button>
                 </div>
-                <MediaBinView
-                  mediaBinItems={mediaBinItems}
-                  isMediaLoading={isMediaLoading}
-                  onAddMedia={handleAddMediaToBin}
-                  onAddText={handleAddTextToBin}
-                  contextMenu={contextMenu}
-                  handleContextMenu={handleContextMenu}
-                  handleDeleteFromContext={handleDeleteFromContext}
-                  handleSplitAudioFromContext={handleSplitAudioFromContext}
-                  handleCloseContextMenu={handleCloseContextMenu}
-                  itemLayout="grid"
-                />
               </div>
             ) : (
-              <ResizablePanelGroup direction="vertical" className="h-full">
-                <ResizablePanel defaultSize={52} minSize={25}>
-                  <div className="h-full min-h-0">
-                    <ChatBox
-                      mediaBinItems={mediaBinItems}
-                      handleDropOnTrack={handleDropOnTrack}
-                      isMinimized={false}
-                      onToggleMinimize={() => setIsChatMinimized(true)}
-                      messages={chatMessages}
-                      onMessagesChange={setChatMessages}
-                      timelineState={timeline}
-                      handleUpdateScrubber={handleUpdateScrubberWithLocking}
-                      handleDeleteScrubber={handleDeleteScrubber}
-                    />
-                  </div>
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={48} minSize={25}>
-                  <div className="h-full min-h-0 border-t border-border/50">
-                    <MediaBinView
-                      mediaBinItems={mediaBinItems}
-                      isMediaLoading={isMediaLoading}
-                      onAddMedia={handleAddMediaToBin}
-                      onAddText={handleAddTextToBin}
-                      contextMenu={contextMenu}
-                      handleContextMenu={handleContextMenu}
-                      handleDeleteFromContext={handleDeleteFromContext}
-                      handleSplitAudioFromContext={handleSplitAudioFromContext}
-                      handleCloseContextMenu={handleCloseContextMenu}
-                      itemLayout="grid"
-                    />
-                  </div>
-                </ResizablePanel>
-              </ResizablePanelGroup>
+              <div className="h-full min-h-0">
+                <ChatBox
+                  mediaBinItems={mediaBinItems}
+                  handleDropOnTrack={handleDropOnTrackWithAutoTranscribe}
+                  isMinimized={false}
+                  onToggleMinimize={() => setIsChatMinimized(true)}
+                  messages={chatMessages}
+                  onMessagesChange={setChatMessages}
+                  timelineState={timeline}
+                  handleUpdateScrubber={handleUpdateScrubberWithLocking}
+                  handleDeleteScrubber={handleDeleteScrubber}
+                />
+              </div>
             )}
           </div>
         </ResizablePanel>

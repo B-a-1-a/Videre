@@ -15,6 +15,15 @@ const FPS = 30;
 const DEFAULT_WHISPER_MODEL =
   process.env.VIDERE_WHISPER_MODEL || 'openai/whisper-small';
 const DEFAULT_WHISPER_TIMESTAMPS = 'word';
+const DEFAULT_WHISPER_COMPUTE_TYPE =
+  process.env.VIDERE_WHISPER_COMPUTE_TYPE || 'int8';
+const DEFAULT_WHISPER_CHUNK_SECONDS = (() => {
+  const parsed = Number(process.env.VIDERE_WHISPER_CHUNK_SECONDS);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return Math.min(Math.max(parsed, 5), 600);
+  }
+  return 45;
+})();
 const WHISPER_SCRIPT_PATH_NPU = path.resolve(
   './app/videorender/whisper_npu_transcribe.py'
 );
@@ -28,7 +37,7 @@ const WHISPER_SETUP_HINT =
   `Install local deps with Python 3.12 in the project root:\n` +
   `python3.12 -m venv .venv-whisper\n` +
   `.venv-whisper/bin/pip install -r ${WHISPER_REQUIREMENTS_PATH}\n` +
-  `Or set VIDERE_WHISPER_PYTHON to a Python interpreter that has torch + transformers.`;
+  `Or set VIDERE_WHISPER_PYTHON to a Python interpreter that has faster-whisper (or torch + transformers).`;
 const WHISPER_NPU_SETUP_HINT =
   `Install NPU deps from repo root: pip install -e ./nexa-caption-lab[npu]\n` +
   `Requires: onnxruntime-qnn, transformers. Or set VIDERE_WHISPER_PYTHON to a Python with nexa-caption-lab[npu].`;
@@ -210,7 +219,15 @@ function normalizeWhisperPythonCandidate(value: string): string {
 function canProbeWhisperPython(pythonBin: string): { ok: boolean; reason?: string } {
   const probe = spawnSync(
     pythonBin,
-    ['-c', 'import torch, transformers'],
+    [
+      '-c',
+      [
+        'import importlib.util as u, sys',
+        'has_fw = u.find_spec("faster_whisper") is not None',
+        'has_tf = u.find_spec("torch") is not None and u.find_spec("transformers") is not None',
+        'sys.exit(0 if (has_fw or has_tf) else 1)',
+      ].join('; '),
+    ],
     {
       encoding: 'utf8',
       timeout: 20_000,
@@ -341,7 +358,9 @@ function runWhisperTranscription(
   jobs: WhisperClipJob[],
   model: string,
   timestamps: string,
-  useLegacyWhisper: boolean = false
+  useLegacyWhisper: boolean = false,
+  computeType: string = DEFAULT_WHISPER_COMPUTE_TYPE,
+  chunkSeconds: number = DEFAULT_WHISPER_CHUNK_SECONDS
 ): Promise<TranscribeClipResult[]> {
   const scriptPath = useLegacyWhisper ? WHISPER_SCRIPT_PATH_LEGACY : WHISPER_SCRIPT_PATH_NPU;
   return new Promise((resolve, reject) => {
@@ -435,6 +454,8 @@ function runWhisperTranscription(
       jobs,
       ffmpegBin: process.env.VIDERE_WHISPER_FFMPEG_BIN || 'ffmpeg',
       device: process.env.VIDERE_WHISPER_DEVICE || 'auto',
+      computeType,
+      chunkSeconds,
     });
     runner.stdin.write(payload);
     runner.stdin.end();
@@ -813,6 +834,13 @@ app.post('/transcribe-clips', async (req: Request, res: Response): Promise<void>
     const model = toSingleString(body.model)?.trim() || DEFAULT_WHISPER_MODEL;
     const timestamps = toSingleString(body.timestamps)?.trim() || DEFAULT_WHISPER_TIMESTAMPS;
     const useLegacyWhisper = Boolean(body.useLegacyWhisper);
+    const computeType =
+      toSingleString(body.computeType)?.trim() || DEFAULT_WHISPER_COMPUTE_TYPE;
+    const chunkSecondsInput = toFiniteNumber(body.chunkSeconds);
+    const chunkSeconds =
+      chunkSecondsInput !== null && chunkSecondsInput > 0
+        ? Math.min(Math.max(chunkSecondsInput, 5), 600)
+        : DEFAULT_WHISPER_CHUNK_SECONDS;
     if (timestamps !== 'word') {
       res.status(400).json({ error: "Only timestamps='word' is supported." });
       return;
@@ -951,7 +979,14 @@ app.post('/transcribe-clips', async (req: Request, res: Response): Promise<void>
       let whisperResults: TranscribeClipResult[] = [];
       let runnerError: string | null = null;
       try {
-        whisperResults = await runWhisperTranscription(jobs, model, timestamps, useLegacyWhisper);
+        whisperResults = await runWhisperTranscription(
+          jobs,
+          model,
+          timestamps,
+          useLegacyWhisper,
+          computeType,
+          chunkSeconds
+        );
       } catch (error) {
         runnerError =
           error instanceof Error

@@ -2,13 +2,19 @@ import React from "react";
 import { Link, Outlet, useLocation } from "react-router";
 import { FileImage, Type, BetweenVerticalEnd } from "lucide-react";
 import { type MediaBinItem, type TimelineState } from "~/components/timeline/types";
-import type { ClipTranscriptsMap } from "~/components/media/captions.types";
+import type {
+  ApplyTranscriptEditRequest,
+  ApplyTranscriptEditResult,
+  ClipTranscriptsMap,
+  GenerateClipCaptionsRequest,
+  GenerateClipCaptionsResult,
+} from "~/components/media/captions.types";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 
 interface LeftPanelProps {
   mediaBinItems: MediaBinItem[];
   isMediaLoading?: boolean;
-  onAddMedia: (file: File) => void;
+  onAddMedia: (file: File) => Promise<void>;
   onAddText: (
     textContent: string,
     fontSize: number,
@@ -23,13 +29,19 @@ interface LeftPanelProps {
     item: MediaBinItem;
   } | null;
   handleContextMenu: (e: React.MouseEvent, item: MediaBinItem) => void;
-  handleDeleteFromContext: () => void;
-  handleSplitAudioFromContext: () => void;
+  handleDeleteFromContext: () => Promise<void>;
+  handleSplitAudioFromContext: () => Promise<void>;
   handleCloseContextMenu: () => void;
   timeline: TimelineState;
   selectedScrubberIds: string[];
   clipTranscripts: ClipTranscriptsMap;
   onClipTranscriptsChange: React.Dispatch<React.SetStateAction<ClipTranscriptsMap>>;
+  onApplyTranscriptEdit: (
+    request: ApplyTranscriptEditRequest
+  ) => ApplyTranscriptEditResult;
+  onGenerateClipCaptions: (
+    request: GenerateClipCaptionsRequest
+  ) => GenerateClipCaptionsResult;
   projectId?: string;
 }
 
@@ -47,6 +59,8 @@ export default function LeftPanel({
   selectedScrubberIds,
   clipTranscripts,
   onClipTranscriptsChange,
+  onApplyTranscriptEdit,
+  onGenerateClipCaptions,
   projectId,
 }: LeftPanelProps) {
   const location = useLocation();
@@ -69,7 +83,6 @@ export default function LeftPanel({
         <div className="flex-1 overflow-hidden">
           <Outlet
             context={{
-              // MediaBin props
               mediaBinItems,
               isMediaLoading,
               onAddMedia,
@@ -83,6 +96,8 @@ export default function LeftPanel({
               selectedScrubberIds,
               clipTranscripts,
               onClipTranscriptsChange,
+              onApplyTranscriptEdit,
+              onGenerateClipCaptions,
               projectId,
             }}
           />
@@ -90,7 +105,16 @@ export default function LeftPanel({
 
         {/* Tab Headers (bottom dock) */}
         <div className="border-t border-border bg-muted/30">
-          <TabsList className="grid w-full grid-cols-3 h-9 bg-transparent p-0">
+          <TabsList className="grid w-full grid-cols-4 h-9 bg-transparent p-0">
+            <TabsTrigger
+              value="media-bin"
+              asChild
+              className="h-8 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              <Link to="media-bin" className="flex items-center gap-1.5">
+                <FileImage className="h-3 w-3" />
+              </Link>
+            </TabsTrigger>
             <TabsTrigger
               value="text-editor"
               asChild
@@ -116,16 +140,6 @@ export default function LeftPanel({
             >
               <Link to="captions" className="flex items-center gap-1.5 text-[10px] font-semibold">
                 CC
-              </Link>
-            </TabsTrigger>
-            {/* Hidden trigger keeps media route valid for Tabs value without showing it in left dock */}
-            <TabsTrigger
-              value="media-bin"
-              asChild
-              className="hidden h-8 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
-            >
-              <Link to="media-bin" className="flex items-center gap-1.5">
-                <FileImage className="h-3 w-3" />
               </Link>
             </TabsTrigger>
           </TabsList>

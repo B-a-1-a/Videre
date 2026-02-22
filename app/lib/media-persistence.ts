@@ -45,6 +45,13 @@ type MediaLookup = {
   byId: Map<string, MediaBinItem>;
   byStorageKey: Map<string, MediaBinItem>;
 };
+const DEFAULT_PLAYER_LEFT = 100;
+const DEFAULT_PLAYER_TOP = 100;
+const DEFAULT_VISUAL_PLAYER_WIDTH = 640;
+const DEFAULT_VISUAL_PLAYER_HEIGHT = 360;
+const DEFAULT_TEXT_FONT_SIZE = 48;
+const DEFAULT_TEXT_PLAYER_WIDTH = 200;
+const DEFAULT_TEXT_PLAYER_HEIGHT = 80;
 
 function readRenderServerBaseUrl(): string {
   if (
@@ -56,6 +63,32 @@ function readRenderServerBaseUrl(): string {
     return process.env.VIDERE_RENDER_SERVER_URL.trim();
   }
   return DEFAULT_RENDER_SERVER_BASE;
+}
+
+function toPositiveNumber(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+function toFiniteOrDefault(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return parsed;
+}
+
+function inferTextLayout(
+  text: ScrubberState["text"] | MediaBinItem["text"]
+): { width: number; height: number } {
+  const fontSize = toPositiveNumber(text?.fontSize) ?? DEFAULT_TEXT_FONT_SIZE;
+  const textLength = Math.max(1, String(text?.textContent ?? "").trim().length);
+  return {
+    width: Math.max(
+      DEFAULT_TEXT_PLAYER_WIDTH,
+      Math.round(textLength * fontSize * 0.6)
+    ),
+    height: Math.max(DEFAULT_TEXT_PLAYER_HEIGHT, Math.round(fontSize * 1.5)),
+  };
 }
 
 function toEncodedStoragePath(storageKey: string): string {
@@ -175,11 +208,44 @@ function normalizeScrubber(
     ) ?? null;
 
   if (!isFileBackedMediaType(scrubber.mediaType)) {
+    if (scrubber.mediaType === "text") {
+      const inferredTextLayout = inferTextLayout(scrubber.text);
+      const normalizedMediaWidth =
+        toPositiveNumber(scrubber.media_width) ?? inferredTextLayout.width;
+      const normalizedMediaHeight =
+        toPositiveNumber(scrubber.media_height) ?? inferredTextLayout.height;
+      const normalizedPlayerWidth =
+        toPositiveNumber(scrubber.width_player) ?? normalizedMediaWidth;
+      const normalizedPlayerHeight =
+        toPositiveNumber(scrubber.height_player) ?? normalizedMediaHeight;
+      return {
+        ...scrubber,
+        storageKey: null,
+        mediaUrlLocal: null,
+        mediaUrlRemote: null,
+        media_width: normalizedMediaWidth,
+        media_height: normalizedMediaHeight,
+        left_player: toFiniteOrDefault(scrubber.left_player, DEFAULT_PLAYER_LEFT),
+        top_player: toFiniteOrDefault(scrubber.top_player, DEFAULT_PLAYER_TOP),
+        width_player: normalizedPlayerWidth,
+        height_player: normalizedPlayerHeight,
+        isUploading: false,
+        uploadProgress: null,
+        groupped_scrubbers: grouped,
+      };
+    }
+
     return {
       ...scrubber,
       storageKey: null,
       mediaUrlLocal: null,
       mediaUrlRemote: null,
+      media_width: toPositiveNumber(scrubber.media_width) ?? 0,
+      media_height: toPositiveNumber(scrubber.media_height) ?? 0,
+      left_player: toFiniteOrDefault(scrubber.left_player, DEFAULT_PLAYER_LEFT),
+      top_player: toFiniteOrDefault(scrubber.top_player, DEFAULT_PLAYER_TOP),
+      width_player: toPositiveNumber(scrubber.width_player) ?? 0,
+      height_player: toPositiveNumber(scrubber.height_player) ?? 0,
       isUploading: false,
       uploadProgress: null,
       groupped_scrubbers: grouped,
@@ -196,7 +262,33 @@ function normalizeScrubber(
   const source = fromStorageKey ?? fromSourceId ?? null;
 
   const resolvedSourceMediaBinId =
-    scrubber.sourceMediaBinId || source?.id || scrubber.id;
+    source?.id || scrubber.sourceMediaBinId || scrubber.id;
+  const normalizedMediaWidth =
+    toPositiveNumber(scrubber.media_width) ??
+    toPositiveNumber(source?.media_width) ??
+    toPositiveNumber(scrubber.width_player) ??
+    (scrubber.mediaType === "audio" ? 0 : DEFAULT_VISUAL_PLAYER_WIDTH);
+  const normalizedMediaHeight =
+    toPositiveNumber(scrubber.media_height) ??
+    toPositiveNumber(source?.media_height) ??
+    toPositiveNumber(scrubber.height_player) ??
+    (scrubber.mediaType === "audio" ? 0 : DEFAULT_VISUAL_PLAYER_HEIGHT);
+  const normalizedPlayerWidth =
+    scrubber.mediaType === "audio"
+      ? 0
+      : toPositiveNumber(scrubber.width_player) ??
+        normalizedMediaWidth ??
+        DEFAULT_VISUAL_PLAYER_WIDTH;
+  const normalizedPlayerHeight =
+    scrubber.mediaType === "audio"
+      ? 0
+      : toPositiveNumber(scrubber.height_player) ??
+        normalizedMediaHeight ??
+        DEFAULT_VISUAL_PLAYER_HEIGHT;
+  const normalizedDurationInSeconds =
+    toPositiveNumber(scrubber.durationInSeconds) ??
+    toPositiveNumber(source?.durationInSeconds) ??
+    scrubber.durationInSeconds;
 
   return {
     ...scrubber,
@@ -204,14 +296,13 @@ function normalizeScrubber(
     sourceMediaBinId: resolvedSourceMediaBinId,
     mediaUrlLocal: null,
     mediaUrlRemote: buildMediaUrl(storageKey) ?? source?.mediaUrlRemote ?? null,
-    media_width:
-      scrubber.media_width === 0
-        ? (source?.media_width ?? scrubber.media_width)
-        : scrubber.media_width,
-    media_height:
-      scrubber.media_height === 0
-        ? (source?.media_height ?? scrubber.media_height)
-        : scrubber.media_height,
+    durationInSeconds: normalizedDurationInSeconds,
+    media_width: normalizedMediaWidth,
+    media_height: normalizedMediaHeight,
+    left_player: toFiniteOrDefault(scrubber.left_player, DEFAULT_PLAYER_LEFT),
+    top_player: toFiniteOrDefault(scrubber.top_player, DEFAULT_PLAYER_TOP),
+    width_player: normalizedPlayerWidth,
+    height_player: normalizedPlayerHeight,
     isUploading: false,
     uploadProgress: null,
     groupped_scrubbers: grouped,
@@ -224,11 +315,32 @@ export function normalizeMediaBinItem(item: MediaBinItem): MediaBinItem {
     null;
 
   if (!isFileBackedMediaType(item.mediaType)) {
+    if (item.mediaType === "text") {
+      const inferredTextLayout = inferTextLayout(item.text);
+      return {
+        ...item,
+        storageKey: null,
+        mediaUrlLocal: null,
+        mediaUrlRemote: null,
+        media_width:
+          toPositiveNumber(item.media_width) ?? inferredTextLayout.width,
+        media_height:
+          toPositiveNumber(item.media_height) ?? inferredTextLayout.height,
+        durationInSeconds: toPositiveNumber(item.durationInSeconds) ?? 0,
+        isUploading: false,
+        uploadProgress: null,
+        groupped_scrubbers: grouped,
+      };
+    }
+
     return {
       ...item,
       storageKey: null,
       mediaUrlLocal: null,
       mediaUrlRemote: null,
+      media_width: toPositiveNumber(item.media_width) ?? 0,
+      media_height: toPositiveNumber(item.media_height) ?? 0,
+      durationInSeconds: toPositiveNumber(item.durationInSeconds) ?? 0,
       isUploading: false,
       uploadProgress: null,
       groupped_scrubbers: grouped,
@@ -241,6 +353,9 @@ export function normalizeMediaBinItem(item: MediaBinItem): MediaBinItem {
     storageKey,
     mediaUrlLocal: null,
     mediaUrlRemote: buildMediaUrl(storageKey),
+    media_width: toPositiveNumber(item.media_width) ?? 0,
+    media_height: toPositiveNumber(item.media_height) ?? 0,
+    durationInSeconds: toPositiveNumber(item.durationInSeconds) ?? 0,
     isUploading: false,
     uploadProgress: null,
     groupped_scrubbers: grouped,

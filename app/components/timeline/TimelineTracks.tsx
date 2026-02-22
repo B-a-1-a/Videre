@@ -27,7 +27,7 @@ interface TimelineTracksProps {
     item: MediaBinItem,
     trackId: string,
     dropLeftPx: number
-  ) => void;
+  ) => { scrubberId: string } | null;
   onDropTransitionOnTrack: (
     transition: Transition,
     trackId: string,
@@ -85,21 +85,6 @@ export const TimelineTracks: React.FC<TimelineTracksProps> = ({
     container.addEventListener("scroll", handleScroll);
     return () => container.removeEventListener("scroll", handleScroll);
   }, [onScroll, containerRef]);
-
-  // Global click handler to deselect when clicking outside timeline
-  useEffect(() => {
-    const handleGlobalClick = (e: MouseEvent) => {
-      const timelineContainer = containerRef.current;
-      if (timelineContainer && !timelineContainer.contains(e.target as Node)) {
-        onSelectScrubber(null, false);
-      }
-    };
-
-    if (selectedScrubberIds.length > 0) {
-      document.addEventListener("click", handleGlobalClick);
-      return () => document.removeEventListener("click", handleGlobalClick);
-    }
-  }, [selectedScrubberIds, containerRef, onSelectScrubber]);
 
   return (
     <div className="flex flex-1 min-h-0">
