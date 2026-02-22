@@ -1,222 +1,153 @@
-# Videre
+# Videre (Electron Local Desktop)
 
-Videre is a fully local Electron-based desktop video editor. It runs completely offline — no cloud dependencies, no authentication, and no telemetry. Your media and projects stay private on your local machine.
+Videre is an Electron desktop video editor running fully local without
+auth/cloud dependencies.
 
-Videre leverages on-device AI for intelligent features like:
-- **Whisper NPU Transcription** — Transcribe video clips using Qualcomm's NPU via `onnxruntime-qnn`
-- **Transcript Analysis** — Automatically detect filler words, retakes, and suggest cuts with timestamps
+## What Changed
 
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────┐
-│  Electron Shell (electron/main.cjs)             │
-│  ┌───────────────┐  ┌────────────────────────┐  │
-│  │ React Router  │  │ Express/Remotion Server │  │
-│  │ Frontend      │  │ (videorender.ts)        │  │
-│  │ :5173         │  │ :8000                   │  │
-│  │               │  │  ├─ /transcribe-clips   │  │
-│  │  Captions.tsx │◄─┤  ├─ /analyze-transcript │  │
-│  │  Timeline     │  │  ├─ /render             │  │
-│  │  Media Panel  │  │  └─ /upload             │  │
-│  └───────────────┘  └─────────┬──────────────┘  │
-│                               │                  │
-│                    ┌──────────▼──────────┐       │
-│                    │ Python venv/        │       │
-│                    │  whisper_npu (.onnx) │       │
-│                    │  llama_npu_analyze   │       │
-│                    │  onnxruntime-qnn     │       │
-│                    └─────────────────────┘       │
-└─────────────────────────────────────────────────┘
-```
-
----
-
-## Prerequisites
-
-| Requirement | Version | Notes |
-|-------------|---------|-------|
-| **Node.js** | 20+ | |
-| **pnpm** | Latest | `npm install -g pnpm` |
-| **Python** | 3.10–3.13 | For AI transcription & analysis |
-| **FFmpeg** | Latest | Must be in your system `PATH` |
-
----
-
-## Installation (From Scratch)
-
-### Step 1: Clone & Install Node Dependencies
-
-```bash
-git clone https://github.com/B-a-1-a/Videre.git
-cd Videre
-pnpm install
-```
-
-### Step 2: Create the Python Virtual Environment
-
-Create a virtual environment named `venv` in the project root. The backend auto-detects this directory.
-
-**Windows (PowerShell/CMD):**
-```powershell
-py -m venv venv
-venv\Scripts\activate
-```
-
-**macOS / Linux:**
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### Step 3: Install Python AI Dependencies
-
-With the virtual environment activated, install the required packages:
-
-```bash
-# Core NPU transcription lab (includes onnxruntime-qnn, transformers, scipy)
-pip install -e "./nexa-caption-lab[npu]"
-
-# Hugging Face transformers (for Whisper tokenizer/processor)
-pip install transformers scipy
-
-# QNN-enabled ONNX Runtime (Snapdragon NPU acceleration)
-pip install onnxruntime-qnn
-```
-
-### Step 4: Verify the Python Environment
-
-Run these commands to confirm everything is installed correctly:
-
-```bash
-# Check QNN (NPU) execution provider is available
-python -c "import onnxruntime as ort; providers = ort.get_available_providers(); print(providers); assert 'QNNExecutionProvider' in providers, 'QNN not found!'"
-
-# Check Whisper NPU module loads
-python -c "from nexa_caption_lab.whisper_npu import transcribe_with_npu; print('Whisper NPU: OK')"
-
-# Check transformers loads
-python -c "import transformers; print('Transformers:', transformers.__version__)"
-
-# Check analysis script runs
-echo '{"scrubberId":"test","text":"hello um","words":[{"text":"hello","start":0,"end":0.3},{"text":"um","start":0.4,"end":0.6}]}' | python app/videorender/llama_npu_analyze.py
-```
-
-Expected output for the last command:
-```json
-{"scrubberId": "test", "success": true, "suggestions": [{"type": "filler", "description": "Filler word: 'um'", "startSec": 0.4, "endSec": 0.6}], "error": null}
-```
-
-### Step 5: Launch the App
-
-```bash
-pnpm desktop:dev
-```
-
-This starts three services concurrently:
-- **React Router** dev server → `http://127.0.0.1:5173`
-- **Express/Remotion** render server → `http://127.0.0.1:8000`
-- **Electron** desktop window
-
----
-
-## Troubleshooting
-
-### PowerShell "scripts disabled" error (Windows)
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
-```
-
-### "No module named 'transformers'"
-Your Python environment is missing dependencies. Activate your venv and reinstall:
-```bash
-venv\Scripts\activate        # Windows
-source venv/bin/activate     # macOS/Linux
-pip install transformers scipy onnxruntime-qnn
-```
-
-### QNNExecutionProvider not showing up
-You likely installed `onnxruntime` (standard) instead of `onnxruntime-qnn`. Fix:
-```bash
-pip install onnxruntime-qnn
-```
-
-### Python version conflicts with torch/qai-hub-models
-If you see dependency resolution errors when installing `qai-hub-models`, your Python version may be too new (3.14+). Use Python 3.12 or 3.13 for compatibility.
-
----
-
-## Available Scripts
-
-| Script | Description |
-|--------|-------------|
-| `pnpm desktop:dev` | Full desktop stack (Web + Render Server + Electron) |
-| `pnpm dev` | React Router frontend only |
-| `pnpm render:server` | Express/Remotion backend only |
-| `pnpm build` | Production build |
-| `pnpm preview` | Serve production build |
-| `pnpm typecheck` | TypeScript type checks |
-| `pnpm lint` | ESLint |
-
----
+- Tauri runtime removed.
+- Frontend moved to a React Router app (`/app`).
+- Authentication removed (local single-user mode).
+- Project persistence moved to local filesystem JSON storage.
+- Media upload/render is local-only via the bundled Remotion/Express server.
 
 ## Local Data Paths
 
-| Data | Location |
-|------|----------|
-| Projects index | `local_data/projects.json` |
-| Project states | `local_data/project_state/<project-id>.json` |
-| Imported media | `out/<project-id>/` |
-| Rendered output | `out/` |
+- Projects index: `local_data/projects.json`
+- Project state files: `local_data/project_state/<project-id>.json`
+- Imported media: `out/<project-id>/`
+- Rendered outputs: `out/`
 
-Override with environment variables: `VIDERE_DATA_DIR`, `VIDERE_MEDIA_DIR`, `TIMELINE_DIR`.
+You can override paths with:
 
----
+- `VIDERE_DATA_DIR`
+- `VIDERE_MEDIA_DIR`
+- `TIMELINE_DIR`
 
-## Environment Variables
+## Development
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VIDERE_WHISPER_PYTHON` | Auto-detected (`venv/`, `.venv-whisper/`, `.venv/`, system) | Python interpreter path |
-| `VIDERE_WHISPER_MODEL` | `openai/whisper-small` | Whisper model (legacy mode only) |
-| `VIDERE_WHISPER_DEVICE` | `auto` | Device for legacy Whisper |
-| `VIDERE_WHISPER_FFMPEG_BIN` | `ffmpeg` | FFmpeg binary path |
-| `VIDERE_NPU_MODELS_DIR` | `nexa-caption-lab/models` | NPU model root directory |
+### Prerequisites
 
----
+- Node.js 20+
+- `pnpm`
+- `ffmpeg` available on your `PATH`
 
-## AI Features
+### Start Desktop App
 
-### Whisper NPU Transcription
-In the **Captions** tab, select a clip and click **Transcribe**. The audio is extracted via FFmpeg, processed through the Whisper Small model on the Snapdragon NPU, and word-level timestamps are returned. Each word gets its own start/end time via quantized distribution across segments.
+```bash
+pnpm install
+pnpm desktop:dev
+```
 
-### Transcript Analysis
-After transcribing, click **Analyze** to detect:
-- **Filler words** — "um", "uh", "basically", "like", etc.
-- **Retakes** — "let me start over", "scratch that", etc.
-- **Long pauses** — Gaps ≥1.5s suggesting natural cut points
-- **Repeated phrases** — Stutters or restarts
+This starts:
 
-Results appear in a modal with timestamps for each suggestion.
+- React Router dev server on `http://127.0.0.1:5173`
+- Local render/upload server on `http://127.0.0.1:8000`
+- Electron window loading the app
+
+Shortcut:
+
+```bash
+./scripts/start-dev.sh
+```
+
+## Scripts
+
+- `pnpm dev` - React Router dev server
+- `pnpm render:server` - Remotion render/upload server
+- `pnpm desktop:dev` - Full desktop dev stack (web + render + Electron)
+- `pnpm build` - React Router production build
+- `pnpm preview` - Serve production build locally
+- `pnpm typecheck` - Type generation + TypeScript checks
+- `pnpm lint` - ESLint checks
+
+## Local Whisper Setup
+
+The Captions tab uses a local Python runner with
+`transformers` + `openai/whisper-small`.
+
+### Install Python Dependencies
+
+Use a Python version supported by your local `torch` build
+(Python 3.11/3.12 is recommended).
+
+```bash
+python3.12 -m venv .venv-whisper
+source .venv-whisper/bin/activate
+pip install -r app/videorender/requirements-whisper.txt
+```
+
+The render server auto-detects `.venv-whisper/bin/python` first. If you use a
+different interpreter path, set `VIDERE_WHISPER_PYTHON`.
+
+### Optional Environment Overrides
+
+- `VIDERE_WHISPER_PYTHON` (default: `python3`)
+- `VIDERE_WHISPER_MODEL` (default: `openai/whisper-small`)
+- `VIDERE_WHISPER_DEVICE` (default: `auto`)
+- `VIDERE_WHISPER_FFMPEG_BIN` (default: `ffmpeg`)
 
 ### First Run Behavior
-The first transcription downloads model weights (~500MB for Whisper Small NPU) and takes longer than subsequent runs. After the initial download, everything runs fully offline.
 
----
+The first transcription request downloads the Whisper model weights and may
+take noticeably longer than subsequent runs.
 
-## Python Labs
+## Image embeddings (SigLIP2)
 
-These standalone research tools are included but not integrated into the Electron UI:
-- `nexa-caption-lab/` — Whisper NPU transcription library
-- `nexa-video-context-lab/` — VLM-based scene analysis and timestamp matching
+Images in `assets/` can be encoded with **google/siglip2-base-patch16-224** for text-to-image retrieval.
 
----
+### Downloading the SigLIP2 model from Hugging Face
+
+The model is downloaded automatically the first time you run the build or retrieval script (via `transformers`’s `from_pretrained("google/siglip2-base-patch16-224")`). It is cached under your Hugging Face cache directory (e.g. `~/.cache/huggingface/hub/` on Linux/macOS, or `%USERPROFILE%\.cache\huggingface\hub\` on Windows).
+
+To **pre-download** the model into the default cache (e.g. while online) without running the scripts:
+
+```bash
+pip install huggingface_hub
+huggingface-cli download google/siglip2-base-patch16-224
+```
+
+The model is stored in the default Hugging Face cache, so the build and retrieval scripts will use it automatically. Otherwise, no separate download step is needed: run the build or retrieval script once with internet and the model is downloaded and cached for you.
+
+### Storing the embeddings
+
+With the virtual environment activated and dependencies installed, run the build script. It loads the model from the cache (or downloads it if missing), encodes every image in `assets/`, and writes the embeddings and index into the repo:
+
+```bash
+# Install dependencies (one-time)
+pip install torch "transformers>=4.49" pillow numpy
+
+# Encode all images in assets/ and store embeddings (run when you add or change images)
+python scripts/build_image_embeddings.py
+```
+
+This creates:
+
+| File | Description |
+|------|-------------|
+| `assets/embeddings/image_embeddings.npy` | Embedding matrix, shape `(N, D)` (N = number of images) |
+| `assets/embeddings/image_index.json` | List of image filenames in the same order as the rows |
+
+Commit these two files to the repo so retrieval can use them offline.
+
+### Retrieve by text
+
+Nearest-neighbour search over the stored embeddings:
+
+```bash
+python scripts/retrieve_by_text.py "a skateboard"
+python scripts/retrieve_by_text.py "random scenery" -k 3
+```
+
+Retrieval runs **fully offline** after the first run (model/tokenizer are loaded from the Hugging Face cache with `local_files_only=True`). Run build or retrieval once with internet to populate the cache, then it works without network.
 
 ## Notes
 
-- No login or account setup required
-- All media stays on local disk
-- Storage views report local disk usage
-- The app auto-detects `venv/`, `.venv-whisper/`, or `.venv/` Python environments
+- No login/session setup is required.
+- Storage/account views now report local disk usage.
+- All imported videos/images/audio remain on local disk.
+
+## Python Labs (unchanged)
+
+- `nexa-caption-lab/`
+- `nexa-video-context-lab/`
