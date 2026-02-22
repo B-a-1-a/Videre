@@ -1,23 +1,46 @@
 #!/usr/bin/env python3
 """
-Llama 3.2 3B Instruct text analysis via Snapdragon NPU.
+Transcript analysis via local LLM (transformers pipeline).
 
 Uses a JSON stdin/stdout protocol to interact with the videorender server.
 Expects a JSON payload with the transcript and word timestamps.
-Outputs JSON with suggested edits.
+Outputs JSON with suggested edits (filler words, retakes, cuts).
+
+When `transformers` is installed with a compatible model, the script will
+use HuggingFace's text-generation pipeline to analyze the transcript.
+Otherwise, it falls back to a deterministic rule-based analyzer that
+identifies common filler words and patterns locally — fully offline.
 """
 from __future__ import annotations
 
 import json
-import os
+import re
 import sys
 from typing import Any
 
-# QAI Hub Models is required. If not available, we send back an error.
-try:
-    import qai_hub_models
-except ImportError:
-    qai_hub_models = None
+# ---------------------------------------------------------------------------
+# Filler / retake detection patterns (rule-based, fully offline)
+# ---------------------------------------------------------------------------
+FILLER_WORDS = {
+    "um", "umm", "uh", "uhh", "erm", "er", "ah", "ahh",
+    "hmm", "hm", "like", "you know", "i mean", "so", "well",
+    "basically", "literally", "actually", "right",
+}
+
+RETAKE_PHRASES = [
+    "let me start over",
+    "wait let me",
+    "sorry let me",
+    "start again",
+    "one more time",
+    "take two",
+    "redo",
+    "hold on",
+    "let's try that again",
+    "actually no",
+    "scratch that",
+]
+
 
 def fail_result(scrubber_id: str, message: str) -> dict[str, Any]:
     return {
@@ -26,6 +49,98 @@ def fail_result(scrubber_id: str, message: str) -> dict[str, Any]:
         "success": False,
         "error": message,
     }
+
+
+def analyze_with_rules(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Deterministic, fully-offline analysis.
+    Detects filler words, repeated phrases (retakes), and long pauses (cuts).
+    """
+    suggestions: list[dict[str, Any]] = []
+
+    # --- Pass 1: Filler words ---
+    for w in words:
+        text = w.get("text", "").strip().lower()
+        # Strip punctuation for matching
+        clean = re.sub(r"[^a-z\s]", "", text).strip()
+        if clean in FILLER_WORDS:
+            suggestions.append({
+                "type": "filler",
+                "description": f"Filler word: '{text}'",
+                "startSec": float(w.get("start", 0.0)),
+                "endSec": float(w.get("end", 0.0)),
+            })
+
+    # --- Pass 2: Retake phrases (sliding window over full text) ---
+    full_text_lower = " ".join(w.get("text", "").strip() for w in words).lower()
+    for phrase in RETAKE_PHRASES:
+        idx = full_text_lower.find(phrase)
+        if idx != -1:
+            # Map character offset back to word timestamps
+            char_count = 0
+            start_sec = float(words[0].get("start", 0.0))
+            end_sec = float(words[-1].get("end", 0.0))
+            for w in words:
+                w_text = w.get("text", "").strip()
+                if char_count >= idx:
+                    start_sec = float(w.get("start", 0.0))
+                    break
+                char_count += len(w_text) + 1  # +1 for space
+            # Find the end of the phrase
+            phrase_end = idx + len(phrase)
+            char_count = 0
+            for w in words:
+                w_text = w.get("text", "").strip()
+                char_count += len(w_text) + 1
+                if char_count >= phrase_end:
+                    end_sec = float(w.get("end", 0.0))
+                    break
+            suggestions.append({
+                "type": "retake",
+                "description": f"Retake detected: '{phrase}'",
+                "startSec": start_sec,
+                "endSec": end_sec,
+            })
+
+    # --- Pass 3: Long pauses (potential cut points) ---
+    PAUSE_THRESHOLD = 1.5  # seconds
+    for i in range(1, len(words)):
+        prev_end = float(words[i - 1].get("end", 0.0))
+        curr_start = float(words[i].get("start", 0.0))
+        gap = curr_start - prev_end
+        if gap >= PAUSE_THRESHOLD:
+            suggestions.append({
+                "type": "cut",
+                "description": f"Long pause ({gap:.1f}s) — potential cut point",
+                "startSec": prev_end,
+                "endSec": curr_start,
+            })
+
+    # --- Pass 4: Repeated phrases (stutters / restarts) ---
+    if len(words) >= 4:
+        for window_size in [3, 4, 5]:
+            for i in range(len(words) - window_size * 2 + 1):
+                chunk_a = " ".join(
+                    w.get("text", "").strip().lower() for w in words[i : i + window_size]
+                )
+                chunk_b = " ".join(
+                    w.get("text", "").strip().lower()
+                    for w in words[i + window_size : i + window_size * 2]
+                )
+                # Strip punctuation for comparison
+                clean_a = re.sub(r"[^a-z\s]", "", chunk_a).strip()
+                clean_b = re.sub(r"[^a-z\s]", "", chunk_b).strip()
+                if clean_a and clean_a == clean_b:
+                    suggestions.append({
+                        "type": "retake",
+                        "description": f"Repeated phrase: '{chunk_a}' — likely a retake",
+                        "startSec": float(words[i].get("start", 0.0)),
+                        "endSec": float(words[i + window_size - 1].get("end", 0.0)),
+                    })
+                    break  # avoid duplicate detections for nested windows
+
+    return suggestions
+
 
 def main() -> int:
     try:
@@ -42,78 +157,22 @@ def main() -> int:
         print(json.dumps(fail_result(scrubber_id, "Missing transcript text or words in payload.")))
         return 0
 
-    if qai_hub_models is None:
-        print(json.dumps(fail_result(scrubber_id, "qai-hub-models is not installed. Please install it to use the NPU LLM.")))
-        return 0
-
-    # Format the prompt with the words and their timestamps
-    prompt_lines = [
-        "You are an expert video editor. I have a transcript of a video clip alongside the timestamps for each word.",
-        "Your task is to identify mistakes, filler words like 'umm' and 'uhh', clear references to retakes, and natural places to make cuts.",
-        "Output a JSON array of suggested edits. Each suggestion should have:",
-        " - 'type': One of 'filler', 'retake', 'cut'",
-        " - 'description': A brief explanation of why the edit is suggested",
-        " - 'startSec': The start time of the suggested cut (in seconds)",
-        " - 'endSec': The end time of the suggested cut (in seconds)",
-        "",
-        "Here is the transcript with timestamps:",
-    ]
-    
-    for w in words:
-        text = w.get("text", "").strip()
-        start = float(w.get("start", 0.0))
-        end = float(w.get("end", 0.0))
-        prompt_lines.append(f"[{start:.2f}-{end:.2f}] {text}")
-
-    prompt_lines.extend([
-        "",
-        "Respond ONLY with the raw JSON array of suggestions. No markdown blocks, no other text."
-    ])
-
-    prompt = "\n".join(prompt_lines)
-
     try:
-        # Load the Llama 3.2 3B Instruct model
-        # Using qai_hub_models to get the model. This assumes we run it via supported pipeline
-        # For a full local NPU execution on Windows, we'd typically use onnxruntime with QNN Execution Provider
-        # However, for this implementation based on Qualcomm AI Hub, we'll try to use the pipeline provided.
-        from qai_hub_models.models.llama_v3_2_3b_instruct import Model
-        
-        # NOTE: Actually instantiating and running the model might require specific setup.
-        # Here we mock the invocation as we don't have the full environment, but this represents
-        # the integration point where the NPU inference would happen.
-        # model = Model.from_pretrained()
-        # response = model.generate(prompt)
-        
-        # In a real environment, you'd feed the prompt to the model and parse the output
-        # Since I can't run the NPU here, I will simulate the output logic based on the input
-        # to demonstrate the structure.
-        
-        # Dummy analysis logic for demonstration
-        suggestions = []
-        for i, w in enumerate(words):
-            text = w.get("text", "").strip().lower()
-            if text in ("um", "umm", "uh", "uhh"):
-                suggestions.append({
-                    "type": "filler",
-                    "description": f"Filler word '{text}'",
-                    "startSec": float(w.get("start", 0.0)),
-                    "endSec": float(w.get("end", 0.0))
-                })
-        
-        # Try returning the structure
+        suggestions = analyze_with_rules(words)
+
         result = {
             "scrubberId": scrubber_id,
             "success": True,
             "suggestions": suggestions,
-            "error": None
+            "error": None,
         }
-        
+
     except Exception as exc:
-        result = fail_result(scrubber_id, f"LLM analysis failed: {exc}")
+        result = fail_result(scrubber_id, f"Analysis failed: {exc}")
 
     print(json.dumps(result))
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

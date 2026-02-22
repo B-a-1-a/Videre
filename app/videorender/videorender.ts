@@ -289,14 +289,18 @@ function resolveWhisperPython(useLegacyWhisper: boolean): string {
     '.venv-whisper/bin/python3',
     '.venv/bin/python',
     '.venv/bin/python3',
+    'venv/bin/python',
+    'venv/bin/python3',
     // Windows venv
     ...(isWin
       ? [
-          path.join('.venv-whisper', 'Scripts', 'python.exe'),
-          path.join('.venv-whisper', 'Scripts', 'python3.exe'),
-          path.join('.venv', 'Scripts', 'python.exe'),
-          path.join('.venv', 'Scripts', 'python3.exe'),
-        ]
+        path.join('.venv-whisper', 'Scripts', 'python.exe'),
+        path.join('.venv-whisper', 'Scripts', 'python3.exe'),
+        path.join('.venv', 'Scripts', 'python.exe'),
+        path.join('.venv', 'Scripts', 'python3.exe'),
+        path.join('venv', 'Scripts', 'python.exe'),
+        path.join('venv', 'Scripts', 'python3.exe'),
+      ]
       : []),
     'python3.12',
     '/opt/homebrew/bin/python3.12',
@@ -418,8 +422,7 @@ function runWhisperTranscription(
       } catch (error) {
         reject(
           new Error(
-            `Failed to parse Whisper runner output: ${
-              error instanceof Error ? error.message : String(error)
+            `Failed to parse Whisper runner output: ${error instanceof Error ? error.message : String(error)
             }`
           )
         );
@@ -602,20 +605,20 @@ app.post('/upload-multiple', upload.array('media', 10), (req: Request, res: Resp
 app.post('/clone-media', (req: Request, res: Response): void => {
   try {
     const { filename, originalName, suffix } = req.body;
-    
+
     if (!filename) {
       res.status(400).json({ error: 'Filename is required' });
       return;
     }
-    
+
     const sourceStorageKey = String(filename);
     const sourcePath = resolveStoragePath(sourceStorageKey);
-    
+
     if (!fs.existsSync(sourcePath)) {
       res.status(404).json({ error: 'Source file not found' });
       return;
     }
-    
+
     // Generate new filename with timestamp and suffix
     const timestamp = Date.now();
     const safeSuffix = String(suffix || 'copy').replace(/[^a-zA-Z0-9_-]/g, '') || 'copy';
@@ -627,17 +630,17 @@ app.post('/clone-media', (req: Request, res: Response): void => {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
-    
+
     // Copy the file
     fs.copyFileSync(sourcePath, destPath);
-    
+
     const fileStats = fs.statSync(destPath);
     const clonedStorageKey = getStorageKeyFromAbsolutePath(destPath);
     const fileUrl = toMediaUrl(clonedStorageKey);
     const fullUrl = `http://localhost:${port}${fileUrl}`;
-    
+
     console.log(`📋 File cloned: ${sourceStorageKey} -> ${clonedStorageKey}`);
-    
+
     res.json({
       success: true,
       filename: clonedStorageKey,
@@ -665,18 +668,18 @@ app.delete('/media/:filename', (req: Request, res: Response): void => {
     }
     const filename = String(rawFilename);
     const filePath = resolveStoragePath(filename);
-    
+
     if (!fs.existsSync(filePath)) {
       res.status(404).json({ error: 'File not found' });
       return;
     }
-    
+
     fs.unlinkSync(filePath);
     console.log(`🗑️ File deleted: ${filename}`);
-    
-    res.json({ 
-      success: true, 
-      message: `File ${filename} deleted successfully` 
+
+    res.json({
+      success: true,
+      message: `File ${filename} deleted successfully`
     });
   } catch (error) {
     console.error('Delete error:', error);
@@ -711,12 +714,16 @@ app.post('/analyze-transcript', async (req: Request, res: Response): Promise<voi
       res.status(500).json({ error: `Analyzer script not found at ${scriptPath}` });
       return;
     }
-    
-    // We try to find a system python for demonstration, might need proper venv resolution
-    // Using simple resolution or just 'python3'/'python' for now
+
+    // Try to resolve the NPU/Whisper python environment first, 
+    // where qai-hub-models should be installed
     let pythonBin = 'python';
-    if (process.platform !== 'win32') {
+    try {
+      pythonBin = resolveWhisperPython(false);
+    } catch (e) {
+      if (process.platform !== 'win32') {
         pythonBin = fs.existsSync('/opt/homebrew/bin/python3') ? '/opt/homebrew/bin/python3' : 'python3';
+      }
     }
 
     const runner = spawn(pythonBin, [scriptPath], {
@@ -751,24 +758,24 @@ app.post('/analyze-transcript', async (req: Request, res: Response): Promise<voi
           rawStdout ||
           '{}';
         const parsed = JSON.parse(jsonLine);
-        
+
         if (parsed.success === false) {
-           res.status(500).json({ error: parsed.error || 'LLM analysis failed.' });
-           return;
+          res.status(500).json({ error: parsed.error || 'LLM analysis failed.' });
+          return;
         }
 
         res.json({
-            success: true,
-            suggestions: parsed.suggestions || [],
-            scrubberId: parsed.scrubberId
+          success: true,
+          suggestions: parsed.suggestions || [],
+          scrubberId: parsed.scrubberId
         });
       } catch (error) {
-        res.status(500).json({ 
+        res.status(500).json({
           error: `Failed to parse LLM runner output: ${error instanceof Error ? error.message : String(error)}`
         });
       }
     });
-    
+
     runner.on('error', (error) => {
       res.status(500).json({ error: `Failed to launch LLM runner: ${error.message}` });
     });

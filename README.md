@@ -1,119 +1,222 @@
 # Videre
 
-Videre is a fully local Electron-based desktop video editor. It is designed to run completely offline without any cloud dependencies or authentication requirements, ensuring your media and projects remain private on your local machine.
+Videre is a fully local Electron-based desktop video editor. It runs completely offline — no cloud dependencies, no authentication, and no telemetry. Your media and projects stay private on your local machine.
 
-Videre leverages advanced local AI integrations to provide intelligent features like automated transcription and transcript analysis using on-device NPUs (Neural Processing Units).
-
----
-
-## 🏗️ Architecture Overview
-
-The application consists of three main pillars:
-1. **Frontend (App/UI)**: Built with React Router (`/app`). Handles the user interface, video timeline editing, and media management.
-2. **Backend (Render & API Server)**: A Node.js Express server (`/app/videorender/videorender.ts`) powered by Remotion. It serves media, builds projects, handles file uploads, and spawns AI Python scripts.
-3. **Desktop Wrapper**: Electron wrapper (`/electron/main.cjs`) that launches the backend server and frontend in a native application window.
+Videre leverages on-device AI for intelligent features like:
+- **Whisper NPU Transcription** — Transcribe video clips using Qualcomm's NPU via `onnxruntime-qnn`
+- **Transcript Analysis** — Automatically detect filler words, retakes, and suggest cuts with timestamps
 
 ---
 
-## 🚀 Getting Started
+## Architecture
 
-### Prerequisites
+```
+┌─────────────────────────────────────────────────┐
+│  Electron Shell (electron/main.cjs)             │
+│  ┌───────────────┐  ┌────────────────────────┐  │
+│  │ React Router  │  │ Express/Remotion Server │  │
+│  │ Frontend      │  │ (videorender.ts)        │  │
+│  │ :5173         │  │ :8000                   │  │
+│  │               │  │  ├─ /transcribe-clips   │  │
+│  │  Captions.tsx │◄─┤  ├─ /analyze-transcript │  │
+│  │  Timeline     │  │  ├─ /render             │  │
+│  │  Media Panel  │  │  └─ /upload             │  │
+│  └───────────────┘  └─────────┬──────────────┘  │
+│                               │                  │
+│                    ┌──────────▼──────────┐       │
+│                    │ Python venv/        │       │
+│                    │  whisper_npu (.onnx) │       │
+│                    │  llama_npu_analyze   │       │
+│                    │  onnxruntime-qnn     │       │
+│                    └─────────────────────┘       │
+└─────────────────────────────────────────────────┘
+```
 
-Before running the application, ensure you have the following installed on your system:
-- **Node.js**: v20 or higher
-- **pnpm**: Fast, disk space efficient package manager (`npm install -g pnpm`)
-- **Python**: v3.10 or higher (Required for AI transcription and analysis)
-- **FFmpeg**: Must be installed and available in your system's `PATH`.
+---
 
-### 1. Install Node Dependencies
+## Prerequisites
 
-Clone the repository and install the standard JavaScript dependencies:
+| Requirement | Version | Notes |
+|-------------|---------|-------|
+| **Node.js** | 20+ | |
+| **pnpm** | Latest | `npm install -g pnpm` |
+| **Python** | 3.10–3.13 | For AI transcription & analysis |
+| **FFmpeg** | Latest | Must be in your system `PATH` |
+
+---
+
+## Installation (From Scratch)
+
+### Step 1: Clone & Install Node Dependencies
 
 ```bash
+git clone https://github.com/B-a-1-a/Videre.git
+cd Videre
 pnpm install
 ```
 
-### 2. Start the Development Environment
+### Step 2: Create the Python Virtual Environment
 
-To launch the complete application stack (Frontend, Backend, and Electron Desktop App), run:
+Create a virtual environment named `venv` in the project root. The backend auto-detects this directory.
+
+**Windows (PowerShell/CMD):**
+```powershell
+py -m venv venv
+venv\Scripts\activate
+```
+
+**macOS / Linux:**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### Step 3: Install Python AI Dependencies
+
+With the virtual environment activated, install the required packages:
+
+```bash
+# Core NPU transcription lab (includes onnxruntime-qnn, transformers, scipy)
+pip install -e "./nexa-caption-lab[npu]"
+
+# Hugging Face transformers (for Whisper tokenizer/processor)
+pip install transformers scipy
+
+# QNN-enabled ONNX Runtime (Snapdragon NPU acceleration)
+pip install onnxruntime-qnn
+```
+
+### Step 4: Verify the Python Environment
+
+Run these commands to confirm everything is installed correctly:
+
+```bash
+# Check QNN (NPU) execution provider is available
+python -c "import onnxruntime as ort; providers = ort.get_available_providers(); print(providers); assert 'QNNExecutionProvider' in providers, 'QNN not found!'"
+
+# Check Whisper NPU module loads
+python -c "from nexa_caption_lab.whisper_npu import transcribe_with_npu; print('Whisper NPU: OK')"
+
+# Check transformers loads
+python -c "import transformers; print('Transformers:', transformers.__version__)"
+
+# Check analysis script runs
+echo '{"scrubberId":"test","text":"hello um","words":[{"text":"hello","start":0,"end":0.3},{"text":"um","start":0.4,"end":0.6}]}' | python app/videorender/llama_npu_analyze.py
+```
+
+Expected output for the last command:
+```json
+{"scrubberId": "test", "success": true, "suggestions": [{"type": "filler", "description": "Filler word: 'um'", "startSec": 0.4, "endSec": 0.6}], "error": null}
+```
+
+### Step 5: Launch the App
 
 ```bash
 pnpm desktop:dev
 ```
 
-This single command utilizes `concurrently` to start:
-- The React Router development server on `http://127.0.0.1:5173`
-- The Local Remotion render/upload API server on `http://127.0.0.1:8000`
-- The Electron window loading the application
-
-> **Troubleshooting PowerShell Errors (Windows)**:
-> If you encounter an error like *`pnpm.ps1 cannot be loaded because running scripts is disabled`*, you need to update your PowerShell execution policy. Run PowerShell as Administrator and execute:
-> ```powershell
-> Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
-> ```
+This starts three services concurrently:
+- **React Router** dev server → `http://127.0.0.1:5173`
+- **Express/Remotion** render server → `http://127.0.0.1:8000`
+- **Electron** desktop window
 
 ---
 
-## 🧠 Local AI Setup (NPU & CPU)
+## Troubleshooting
 
-Videre integrates on-device AI for transcribing video clips and analyzing transcripts. These require a Python virtual environment to run.
-
-### Setup the Python Virtual Environment
-
-From the root of the repository, create a Python virtual environment named `.venv-whisper`. *It must be named exactly this for the backend to detect it automatically.*
-
-**Windows (PowerShell/CMD):**
+### PowerShell "scripts disabled" error (Windows)
 ```powershell
-py -m venv .venv-whisper
-.venv-whisper\Scripts\activate
-# Install NPU-accelerated transcription lab dependencies
-pip install -e ./nexa-caption-lab[npu]
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 ```
 
-**macOS / Linux:**
+### "No module named 'transformers'"
+Your Python environment is missing dependencies. Activate your venv and reinstall:
 ```bash
-python3 -m venv .venv-whisper
-source .venv-whisper/bin/activate
-pip install -e ./nexa-caption-lab[npu]
+venv\Scripts\activate        # Windows
+source venv/bin/activate     # macOS/Linux
+pip install transformers scipy onnxruntime-qnn
 ```
 
-### 1. Whisper NPU Transcription
-The "Captions" tab allows you to transcribe audio from video clips. By default, it uses **Whisper on the Snapdragon NPU** (via `onnxruntime-qnn`). The first run will automatically download the required NPU model weights into `nexa-caption-lab/models/`.
+### QNNExecutionProvider not showing up
+You likely installed `onnxruntime` (standard) instead of `onnxruntime-qnn`. Fix:
+```bash
+pip install onnxruntime-qnn
+```
 
-*Legacy CPU/GPU testing option*: If you don't have an NPU, you can optionally install standard PyTorch/Transformers into the same virtual environment using `pip install -r app/videorender/requirements-whisper.txt`, and toggle "Use legacy Whisper" in the UI.
-
-### 2. Llama 3.2 3B Instruct Transcript Analysis
-After transcribing a clip, you can click **Analyze** in the UI to use the Llama 3.2 3B Instruct model (via Qualcomm AI Hub tools). The local LLM will detect filler words ("umms", "uhhs"), retakes, and suggest structural cuts with frame-accurate timestamps. This uses `qai-hub-models` within your Python environment.
-
----
-
-## 📁 Local Data Management
-
-All data remains stored locally. You can find your saved files and media in the root directories created during runtime:
-
-- **Projects Index**: `local_data/projects.json`
-- **Project State Files**: `local_data/project_state/<project-id>.json`
-- **Imported Media Files**: `out/<project-id>/`
-- **Rendered Outputs**: `out/`
-
-*Note: You can override these paths by setting the environment variables `VIDERE_DATA_DIR`, `VIDERE_MEDIA_DIR`, or `TIMELINE_DIR`.*
+### Python version conflicts with torch/qai-hub-models
+If you see dependency resolution errors when installing `qai-hub-models`, your Python version may be too new (3.14+). Use Python 3.12 or 3.13 for compatibility.
 
 ---
 
-## 🛠️ Available Scripts
+## Available Scripts
 
-Here are the granular `pnpm` scripts available in `package.json` if you wish to run components individually:
+| Script | Description |
+|--------|-------------|
+| `pnpm desktop:dev` | Full desktop stack (Web + Render Server + Electron) |
+| `pnpm dev` | React Router frontend only |
+| `pnpm render:server` | Express/Remotion backend only |
+| `pnpm build` | Production build |
+| `pnpm preview` | Serve production build |
+| `pnpm typecheck` | TypeScript type checks |
+| `pnpm lint` | ESLint |
 
-- `pnpm dev` - Starts only the React Router frontend dev server.
-- `pnpm render:server` - Starts only the backend Express/Remotion API server.
-- `pnpm desktop:dev` - Starts the full local desktop stack (Web + Server + Electron).
-- `pnpm build` - Creates a production build of the React Router application.
-- `pnpm preview` - Serves the production build locally.
-- `pnpm typecheck` - Performs TypeScript type-checking.
-- `pnpm lint` - Runs ESLint across the codebase.
+---
 
-## 🧪 Additional Python Labs
+## Local Data Paths
 
-This repository also contains standalone research labs for video context analysis. These do not natively run in the Electron UI but can be executed via CLI:
-- `nexa-video-context-lab/`: Scripts for building scene context, finding timestamp matches via VLMs, and exporting segments.
-- `nexa-caption-lab/`: The core library interfacing with Whisper for NPU optimizations.
+| Data | Location |
+|------|----------|
+| Projects index | `local_data/projects.json` |
+| Project states | `local_data/project_state/<project-id>.json` |
+| Imported media | `out/<project-id>/` |
+| Rendered output | `out/` |
+
+Override with environment variables: `VIDERE_DATA_DIR`, `VIDERE_MEDIA_DIR`, `TIMELINE_DIR`.
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VIDERE_WHISPER_PYTHON` | Auto-detected (`venv/`, `.venv-whisper/`, `.venv/`, system) | Python interpreter path |
+| `VIDERE_WHISPER_MODEL` | `openai/whisper-small` | Whisper model (legacy mode only) |
+| `VIDERE_WHISPER_DEVICE` | `auto` | Device for legacy Whisper |
+| `VIDERE_WHISPER_FFMPEG_BIN` | `ffmpeg` | FFmpeg binary path |
+| `VIDERE_NPU_MODELS_DIR` | `nexa-caption-lab/models` | NPU model root directory |
+
+---
+
+## AI Features
+
+### Whisper NPU Transcription
+In the **Captions** tab, select a clip and click **Transcribe**. The audio is extracted via FFmpeg, processed through the Whisper Small model on the Snapdragon NPU, and word-level timestamps are returned. Each word gets its own start/end time via quantized distribution across segments.
+
+### Transcript Analysis
+After transcribing, click **Analyze** to detect:
+- **Filler words** — "um", "uh", "basically", "like", etc.
+- **Retakes** — "let me start over", "scratch that", etc.
+- **Long pauses** — Gaps ≥1.5s suggesting natural cut points
+- **Repeated phrases** — Stutters or restarts
+
+Results appear in a modal with timestamps for each suggestion.
+
+### First Run Behavior
+The first transcription downloads model weights (~500MB for Whisper Small NPU) and takes longer than subsequent runs. After the initial download, everything runs fully offline.
+
+---
+
+## Python Labs
+
+These standalone research tools are included but not integrated into the Electron UI:
+- `nexa-caption-lab/` — Whisper NPU transcription library
+- `nexa-video-context-lab/` — VLM-based scene analysis and timestamp matching
+
+---
+
+## Notes
+
+- No login or account setup required
+- All media stays on local disk
+- Storage views report local disk usage
+- The app auto-detects `venv/`, `.venv-whisper/`, or `.venv/` Python environments
