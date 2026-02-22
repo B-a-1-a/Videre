@@ -92,9 +92,9 @@ different interpreter path, set `VIDERE_WHISPER_PYTHON`.
 The first transcription request downloads the Whisper model weights and may
 take noticeably longer than subsequent runs.
 
-## Image embeddings (SigLIP2)
+## Image and video-section embeddings (SigLIP2)
 
-Images in `assets/` can be encoded with **google/siglip2-base-patch16-224** for text-to-image retrieval.
+Images and videos in `assets/` can be encoded with **google/siglip2-base-patch16-224** for text-based retrieval. Each image gets one embedding; each video is split into **4–5 sections** by time, and each section gets an **average embedding** (from a few sampled frames), so you can retrieve relevant video segments by text.
 
 ### Downloading the SigLIP2 model from Hugging Face
 
@@ -111,13 +111,13 @@ The model is stored in the default Hugging Face cache, so the build and retrieva
 
 ### Storing the embeddings
 
-With the virtual environment activated and dependencies installed, run the build script. It loads the model from the cache (or downloads it if missing), encodes every image in `assets/`, and writes the embeddings and index into the repo:
+With the virtual environment activated and dependencies installed, run the build script. It loads the model from the cache (or downloads it if missing), encodes every image and every video section in `assets/`, and writes the embeddings and index:
 
 ```bash
-# Install dependencies (one-time)
-pip install torch "transformers>=4.49" pillow numpy
+# Install dependencies (one-time; opencv-python needed for video frame extraction)
+pip install torch "transformers>=4.49" pillow numpy opencv-python
 
-# Encode all images in assets/ and store embeddings (run when you add or change images)
+# Encode all images and video sections in assets/ and store embeddings
 python scripts/build_image_embeddings.py
 ```
 
@@ -125,8 +125,8 @@ This creates:
 
 | File | Description |
 |------|-------------|
-| `assets/embeddings/image_embeddings.npy` | Embedding matrix, shape `(N, D)` (N = number of images) |
-| `assets/embeddings/image_index.json` | List of image filenames in the same order as the rows |
+| `assets/embeddings/image_embeddings.npy` | Embedding matrix, shape `(N, D)` (N = images + video sections) |
+| `assets/embeddings/image_index.json` | List of ids: image filenames and `"video.mp4#0.0-4.0"`-style segment ids |
 
 Commit these two files to the repo so retrieval can use them offline.
 
@@ -135,9 +135,11 @@ Commit these two files to the repo so retrieval can use them offline.
 Nearest-neighbour search over the stored embeddings:
 
 ```bash
-python scripts/retrieve_by_text.py "a skateboard"
-python scripts/retrieve_by_text.py "random scenery" -k 3
+python scripts/retrieve_by_text.py "food"
+python scripts/retrieve_by_text.py "a skateboard" -k 3
 ```
+
+**Query tip:** Describe what’s *in* the image (e.g. `"food"`, `"person skating"`) rather than intents like "i want food". The script wraps your text as "This is a photo of …" for better matching. Use `--raw` to use your exact query.
 
 Retrieval runs **fully offline** after the first run (model/tokenizer are loaded from the Hugging Face cache with `local_files_only=True`). Run build or retrieval once with internet to populate the cache, then it works without network.
 

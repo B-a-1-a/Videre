@@ -2,16 +2,17 @@
 """
 Retrieve relevant images by text query using stored SigLIP2 embeddings.
 
-Uses nearest-neighbour search (cosine similarity) between the query text
-embedding and precomputed image embeddings.
+For best results, describe what is *in* the image (e.g. "food", "a skateboard",
+"person eating") rather than abstract intents ("i want food"). The script
+automatically wraps your query as "This is a photo of <query>." to match how
+SigLIP2 was trained. Use --raw to skip that and use your exact text.
 
-Runs fully offline after the first run: model and tokenizer are loaded from
-the Hugging Face cache (local_files_only=True). The first run needs internet
-to download google/siglip2-base-patch16-224.
+Runs fully offline after the first run (local_files_only=True).
 
 Usage:
-  python scripts/retrieve_by_text.py "a skateboard"
-  python scripts/retrieve_by_text.py "random scenery" -k 3
+  python scripts/retrieve_by_text.py "food"
+  python scripts/retrieve_by_text.py "a skateboard" -k 3
+  python scripts/retrieve_by_text.py "i want food" --raw   # use exact query
 
 Requires: pip install torch transformers numpy
 """
@@ -29,6 +30,9 @@ from transformers import AutoModel, Siglip2Tokenizer
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EMBEDDINGS_DIR = REPO_ROOT / "assets" / "embeddings"
 MODEL_ID = "google/siglip2-base-patch16-224"
+
+# SigLIP2 zero-shot style; improves retrieval when query describes visual content
+PROMPT_TEMPLATE = "This is a photo of {}."
 
 
 def load_embeddings() -> tuple[np.ndarray, list[str]]:
@@ -66,14 +70,15 @@ def search(
     query: str,
     top_k: int = 5,
     embeddings_dir: Path | None = None,
+    raw_query: bool = False,
 ) -> list[tuple[str, float]]:
     """
     Return top-k (filename, score) pairs for the text query.
     Score is cosine similarity in [0, 1] (higher = more similar).
+    If raw_query is False, query is wrapped as "This is a photo of <query>." for better matching.
     """
     dir_ = embeddings_dir or EMBEDDINGS_DIR
     embeddings, index = load_embeddings()
-    # Load model for text encoding
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = AutoModel.from_pretrained(
         MODEL_ID,
@@ -84,7 +89,8 @@ def search(
     tokenizer = Siglip2Tokenizer.from_pretrained(MODEL_ID, local_files_only=True)
     device = next(model.parameters()).device
 
-    q = get_text_embedding(model, tokenizer, query, device)
+    text = query if raw_query else PROMPT_TEMPLATE.format(query.strip())
+    q = get_text_embedding(model, tokenizer, text, device)
     # Cosine similarity (embeddings already normalized)
     scores = (embeddings @ q.T).squeeze(1)
     # Clamp to [0, 1] for display (cosine can be in [-1,1])
@@ -95,13 +101,20 @@ def search(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Retrieve images by text query")
-    parser.add_argument("query", help="Text query (e.g. 'a skateboard')")
+    parser = argparse.ArgumentParser(
+        description="Retrieve images by text query. Use descriptive phrases (e.g. 'food', 'a skateboard')."
+    )
+    parser.add_argument("query", help="What to search for (e.g. 'food', 'person skating')")
     parser.add_argument("-k", type=int, default=5, help="Number of results (default: 5)")
+    parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="Use query as-is instead of wrapping as 'This is a photo of <query>.'",
+    )
     args = parser.parse_args()
 
     try:
-        results = search(args.query, top_k=args.k)
+        results = search(args.query, top_k=args.k, raw_query=args.raw)
     except FileNotFoundError as e:
         print(e, file=sys.stderr)
         return 1

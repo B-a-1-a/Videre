@@ -1,4 +1,5 @@
 [
+  "food1.jpg",
   "random1.webp",
   "random2.jpg",
   "random3.jpg",
@@ -8,5 +9,15 @@
   "random7.jpg",
   "skatebaord1.webp",
   "skateboard2.jpg",
-  "skateboard3.jpg"
+  "skateboard3.jpg",
+  "hungry1.mp4#0.0-2.5",
+  "hungry1.mp4#2.5-4.9",
+  "hungry1.mp4#4.9-7.4",
+  "hungry1.mp4#7.4-9.8",
+  "hungry1.mp4#9.8-12.3",
+  "hungry2.mp4#0.0-4.0",
+  "hungry2.mp4#4.0-7.9",
+  "hungry2.mp4#7.9-11.9",
+  "hungry2.mp4#11.9-15.8",
+  "hungry2.mp4#15.8-19.8"
 ]
