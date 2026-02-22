@@ -264,7 +264,7 @@ export function ChatBox({
             );
 
             if (!mediaItem) {
-              aiResponseContent = `❌ Error: Media item with ID "${function_call.scrubber_id}" not found in the media bin.`;
+              aiResponseContent = `Error: Media item with ID "${function_call.scrubber_id}" not found in the media bin.`;
             } else {
               // Execute the function
               llmAddScrubberToTimeline(
@@ -275,7 +275,7 @@ export function ChatBox({
                 handleDropOnTrack
               );
 
-              aiResponseContent = `✅ Successfully added "${mediaItem.name}" to ${function_call.track_id} at position ${function_call.drop_left_px}px.`;
+              aiResponseContent = `Successfully added "${mediaItem.name}" to ${function_call.track_id} at position ${function_call.drop_left_px}px.`;
             }
           } else if (function_call.function_name === "LLMMoveScrubber") {
             // Execute move scrubber operation
@@ -296,7 +296,7 @@ export function ChatBox({
               (s) => s.id === function_call.scrubber_id
             );
             const movedName = moved ? moved.name : function_call.scrubber_id;
-            aiResponseContent = `✅ Moved "${movedName}" to track ${function_call.new_track_number} at ${function_call.new_position_seconds}s.`;
+            aiResponseContent = `Successfully moved "${movedName}" to track ${function_call.new_track_number} at ${function_call.new_position_seconds}s.`;
           } else if (function_call.function_name === "LLMAddScrubberByName") {
             // Add media by name with defaults
             llmAddScrubberByName(
@@ -308,7 +308,7 @@ export function ChatBox({
               handleDropOnTrack
             );
 
-            aiResponseContent = `✅ Added "${function_call.scrubber_name}" to track ${function_call.track_number} at ${function_call.position_seconds}s.`;
+            aiResponseContent = `Successfully added "${function_call.scrubber_name}" to track ${function_call.track_number} at ${function_call.position_seconds}s.`;
           } else if (
             function_call.function_name === "LLMDeleteScrubbersInTrack"
           ) {
@@ -320,14 +320,13 @@ export function ChatBox({
               timelineState,
               handleDeleteScrubber
             );
-            aiResponseContent = `✅ Removed all scrubbers in track ${function_call.track_number}.`;
+            aiResponseContent = `Successfully removed all scrubbers in track ${function_call.track_number}.`;
           } else {
-            aiResponseContent = `❌ Unknown function: ${function_call.function_name}`;
+            aiResponseContent = `Unknown function: ${function_call.function_name}`;
           }
         } catch (error) {
-          aiResponseContent = `❌ Error executing function: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`;
+          aiResponseContent = `❌ Error executing function: ${error instanceof Error ? error.message : "Unknown error"
+            }`;
         }
       } else if (functionCallResponse.assistant_message) {
         aiResponseContent = functionCallResponse.assistant_message;
@@ -349,7 +348,7 @@ export function ChatBox({
 
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: `❌ Sorry, I encountered an error while processing your request. Please try again.`,
+        content: `Sorry, I encountered an error while processing your request. Please try again.`,
         isUser: false,
         timestamp: new Date(),
       };
@@ -409,7 +408,6 @@ export function ChatBox({
       {/* Chat Header */}
       <div className="h-9 border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between px-3 shrink-0">
         <div className="flex items-center gap-2">
-          <Bot className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-sm font-medium tracking-tight">Ask Videre AI</span>
         </div>
 
@@ -488,21 +486,16 @@ export function ChatBox({
               {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex ${
-                    message.isUser ? "justify-end" : "justify-start"
-                  }`}
+                  className={`flex ${message.isUser ? "justify-end" : "justify-start"
+                    }`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-lg px-3 py-2 text-xs ${
-                      message.isUser
-                        ? "bg-primary text-primary-foreground ml-8"
-                        : "bg-muted mr-8"
-                    }`}
+                    className={`max-w-[80%] rounded-lg px-3 py-2 text-xs ${message.isUser
+                      ? "bg-primary text-primary-foreground ml-8"
+                      : "bg-muted mr-8"
+                      }`}
                   >
                     <div className="flex items-start gap-2">
-                      {!message.isUser && (
-                        <Bot className="h-3 w-3 mt-0.5 text-muted-foreground shrink-0" />
-                      )}
                       <div className="flex-1 min-w-0">
                         <p className="leading-relaxed break-words overflow-wrap-anywhere">
                           {message.content}
@@ -511,9 +504,6 @@ export function ChatBox({
                           {formatTime(message.timestamp)}
                         </span>
                       </div>
-                      {message.isUser && (
-                        <User className="h-3 w-3 mt-0.5 text-primary-foreground/70 shrink-0" />
-                      )}
                     </div>
                   </div>
                 </div>
@@ -562,11 +552,10 @@ export function ChatBox({
             {filteredMentions.map((item, index) => (
               <div
                 key={item.id}
-                className={`px-3 py-2 text-xs cursor-pointer flex items-center gap-2 ${
-                  index === selectedMentionIndex
-                    ? "bg-accent text-accent-foreground"
-                    : "hover:bg-muted"
-                }`}
+                className={`px-3 py-2 text-xs cursor-pointer flex items-center gap-2 ${index === selectedMentionIndex
+                  ? "bg-accent text-accent-foreground"
+                  : "hover:bg-muted"
+                  }`}
                 onClick={() => insertMention(item)}
               >
                 <div className="w-6 h-6 bg-muted/50 rounded flex items-center justify-center">

@@ -1020,8 +1020,6 @@ export default function TimelineEditor() {
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <VidereLogo className="h-4 w-4" />
-          <h1 className="text-sm font-medium tracking-tight truncate hidden sm:inline-block">Videre Studio</h1>
         </div>
 
         {/* Center project name */}
@@ -1037,7 +1035,6 @@ export default function TimelineEditor() {
             onClick={handleSaveTimeline}
             className="h-7 px-2 text-xs"
             title="Save timeline (Ctrl/Cmd+S)">
-            <SaveIcon className="h-3 w-3 mr-1" />
             Save
           </Button>
 
@@ -1159,7 +1156,6 @@ export default function TimelineEditor() {
                           onClick={() => setIsChatMinimized(false)}
                           className="h-6 w-6 p-0 text-primary"
                           title="Open Chat">
-                          <VidereLogo className="h-3 w-3" />
                         </Button>
                       </>
                     )}
@@ -1268,7 +1264,6 @@ export default function TimelineEditor() {
                     </div>
                     <Separator orientation="vertical" className="h-4 mx-1" />
                     <Button variant="ghost" size="sm" onClick={handleAddTrackClick} className="h-6 px-2 text-xs">
-                      <Plus className="h-3 w-3 mr-1" />
                       Track
                     </Button>
                     <Separator orientation="vertical" className="h-4 mx-1" />
@@ -1278,12 +1273,10 @@ export default function TimelineEditor() {
                       onClick={handleSplitClick}
                       className="h-6 px-2 text-xs"
                       title="Split selected scrubber at ruler position">
-                      <Scissors className="h-3 w-3 mr-1" />
                       Split
                     </Button>
                     <Separator orientation="vertical" className="h-4 mx-1" />
                     <Button variant="ghost" size="sm" onClick={handleLogTimelineData} className="h-6 px-2 text-xs">
-                      <Settings className="h-3 w-3 mr-1" />
                       Debug
                     </Button>
                   </div>

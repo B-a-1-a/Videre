@@ -512,7 +512,6 @@ export default function Captions() {
     <div className="h-full flex flex-col bg-background">
       <div className="px-2 py-2 border-b border-border/50 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <Speech className="h-3.5 w-3.5 text-muted-foreground" />
           <p className="text-xs font-medium truncate">Clip Transcription</p>
           <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-mono">
             {selectedScrubberIds.length} selected
@@ -525,7 +524,6 @@ export default function Captions() {
             className="h-6 px-2 text-xs"
             onClick={handleCopyTranscript}
           >
-            <Copy className="h-3 w-3 mr-1" />
             Copy
           </Button>
           <Button
@@ -535,7 +533,6 @@ export default function Captions() {
             disabled={isSubmitting || retryIds.length === 0}
             onClick={handleRetryFailed}
           >
-            <RefreshCw className="h-3 w-3 mr-1" />
             Retry Failed
           </Button>
           <Button
@@ -679,8 +676,8 @@ export default function Captions() {
                                 event.target.value
                               )
                             }
-                            rows={4}
-                            className="w-full rounded border border-border/50 bg-background p-2 text-xs leading-relaxed resize-y min-h-20"
+                            rows={12}
+                            className="w-full rounded border border-border/50 bg-background p-2 text-xs leading-relaxed resize-y min-h-[150px]"
                             spellCheck={false}
                           />
                           <p className="text-[10px] text-muted-foreground mt-1">

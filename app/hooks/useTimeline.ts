@@ -1061,12 +1061,13 @@ export const useTimeline = () => {
       const clipEndSec = Math.max(
         clipStartSec + 1 / FPS,
         referenceScrubber.durationInSeconds -
-          (referenceScrubber.trimAfter || 0) / FPS
+        (referenceScrubber.trimAfter || 0) / FPS
       );
       const minDurationSec = 1 / FPS;
       const sanitizedSegments = request.segments
         .map((segment) => ({
           text: String(segment.text || "").replace(/\s+/g, " ").trim(),
+          words: segment.words || [],
           startSec: Number(segment.startSec),
           endSec: Number(segment.endSec),
         }))
@@ -1099,6 +1100,7 @@ export const useTimeline = () => {
 
       const sequencedSegments: Array<{
         text: string;
+        words?: { text: string; start: number; end: number }[];
         startSec: number;
         endSec: number;
       }> = [];
@@ -1111,6 +1113,7 @@ export const useTimeline = () => {
         }
         sequencedSegments.push({
           text: segment.text,
+          words: segment.words,
           startSec,
           endSec,
         });
@@ -1138,7 +1141,7 @@ export const useTimeline = () => {
         : "#FFFFFF";
       const textAlign: "left" | "center" | "right" =
         request.textStyle.textAlign === "left" ||
-        request.textStyle.textAlign === "right"
+          request.textStyle.textAlign === "right"
           ? request.textStyle.textAlign
           : "center";
       const fontWeight: "normal" | "bold" =
@@ -1146,12 +1149,12 @@ export const useTimeline = () => {
 
       const frameWidth =
         Number.isFinite(referenceScrubber.media_width) &&
-        referenceScrubber.media_width > 0
+          referenceScrubber.media_width > 0
           ? referenceScrubber.media_width
           : 1920;
       const frameHeight =
         Number.isFinite(referenceScrubber.media_height) &&
-        referenceScrubber.media_height > 0
+          referenceScrubber.media_height > 0
           ? referenceScrubber.media_height
           : 1080;
       const captionWidthPlayer = Math.max(320, Math.round(frameWidth * 0.84));
@@ -1164,8 +1167,8 @@ export const useTimeline = () => {
         0,
         Math.round(
           frameHeight -
-            captionHeightPlayer -
-            Math.max(48, frameHeight * 0.08)
+          captionHeightPlayer -
+          Math.max(48, frameHeight * 0.08)
         )
       );
 
@@ -1203,7 +1206,8 @@ export const useTimeline = () => {
               color,
               textAlign,
               fontWeight,
-              template: null,
+              template: request.textStyle.template || null,
+              words: segment.words,
             },
             groupped_scrubbers: null,
             sourceMediaBinId: captionSourceMediaBinId,
@@ -1242,13 +1246,13 @@ export const useTimeline = () => {
         const shouldReplace = request.replaceExisting !== false;
         const removedCaptionIds = shouldReplace
           ? new Set(
-              captionTrack.scrubbers
-                .filter(
-                  (scrubber) =>
-                    scrubber.sourceMediaBinId === captionSourceMediaBinId
-                )
-                .map((scrubber) => scrubber.id)
-            )
+            captionTrack.scrubbers
+              .filter(
+                (scrubber) =>
+                  scrubber.sourceMediaBinId === captionSourceMediaBinId
+              )
+              .map((scrubber) => scrubber.id)
+          )
           : new Set<string>();
 
         const retainedScrubbers = captionTrack.scrubbers.filter((scrubber) => {

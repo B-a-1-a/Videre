@@ -553,7 +553,6 @@ export function MediaBinView({
               onClick={onAddMediaClick}
               className="h-6 px-2 text-xs"
             >
-              <Upload className="h-3 w-3 mr-1" />
               Add Assets
             </Button>
             {/* Arrange segmented switch - subtle, no gray bg */}
@@ -561,7 +560,7 @@ export function MediaBinView({
               <Button
                 variant="ghost"
                 size="sm"
-                className={`h-5 w-5 p-0 bg-transparent hover:bg-transparent ${arrangeMode === "default"
+                className={`h-5 px-2 text-xs bg-transparent hover:bg-transparent ${arrangeMode === "default"
                   ? "text-primary"
                   : "text-muted-foreground/70 hover:text-foreground"
                   }`}
@@ -569,12 +568,12 @@ export function MediaBinView({
                 title="Default order"
                 aria-pressed={arrangeMode === "default"}
               >
-                <List className="h-2 w-2" />
+                List
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                className={`h-5 w-5 p-0 bg-transparent hover:bg-transparent ${arrangeMode === "group"
+                className={`h-5 px-2 text-xs bg-transparent hover:bg-transparent ${arrangeMode === "group"
                   ? "text-primary"
                   : "text-muted-foreground/70 hover:text-foreground"
                   }`}
@@ -582,7 +581,7 @@ export function MediaBinView({
                 title="Smart Group"
                 aria-pressed={arrangeMode === "group"}
               >
-                <Layers className="h-2 w-2" />
+                Group
               </Button>
             </div>
 
@@ -594,10 +593,10 @@ export function MediaBinView({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-5 w-5 p-0 text-muted-foreground/70 hover:text-foreground bg-transparent hover:bg-transparent"
+                  className="h-5 px-2 text-xs text-muted-foreground/70 hover:text-foreground bg-transparent hover:bg-transparent"
                   title="Sort"
                 >
-                  <ArrowUpDown className="h-3 w-3" />
+                  Sort
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-[12rem]">
@@ -611,10 +610,6 @@ export function MediaBinView({
                     }`}
                   data-variant="ghost"
                 >
-                  <ArrowUpDown
-                    className={`h-3 w-3 ${sortBy === "default" ? "text-primary" : ""
-                      }`}
-                  />{" "}
                   Original order
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -623,10 +618,6 @@ export function MediaBinView({
                     }`}
                   data-variant="ghost"
                 >
-                  <ChevronUp
-                    className={`h-3 w-3 ${sortBy === "name_asc" ? "text-primary" : ""
-                      }`}
-                  />{" "}
                   Name A–Z
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -635,10 +626,6 @@ export function MediaBinView({
                     }`}
                   data-variant="ghost"
                 >
-                  <ChevronDown
-                    className={`h-3 w-3 ${sortBy === "name_desc" ? "text-primary" : ""
-                      }`}
-                  />{" "}
                   Name Z–A
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -797,17 +784,6 @@ export function MediaBinView({
                     }
                   >
                     <div className="flex items-center gap-1.5 text-muted-foreground">
-                      {section.key === "videos" && (
-                        <FileVideo className="h-3 w-3" />
-                      )}
-                      {section.key === "gifs" && (
-                        <FileImage className="h-3 w-3" />
-                      )}
-                      {section.key === "images" && (
-                        <FileImage className="h-3 w-3" />
-                      )}
-                      {section.key === "audio" && <Music className="h-3 w-3" />}
-                      {section.key === "text" && <Type className="h-3 w-3" />}
                       <span className="font-medium text-foreground/90">
                         {section.title}
                       </span>

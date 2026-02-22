@@ -12,6 +12,7 @@ import { wipe } from "@remotion/transitions/wipe";
 import { flip } from "@remotion/transitions/flip";
 import { slide } from "@remotion/transitions/slide";
 import React from "react";
+import { useCurrentFrame } from "remotion";
 import {
   FPS,
   PIXELS_PER_SECOND,
@@ -44,6 +45,74 @@ export type VideoPlayerProps = {
   selectedItem: string | null;
   setSelectedItem: React.Dispatch<React.SetStateAction<string | null>>;
   getPixelsPerSecond: number | (() => number);
+};
+
+const DynamicText = ({
+  scrubber,
+  resolvedPixelsPerSecond,
+}: {
+  scrubber: TimelineDataItem["scrubbers"][0] | ScrubberState;
+  resolvedPixelsPerSecond: number;
+}) => {
+  const frame = useCurrentFrame();
+  const timeInSeconds = frame / FPS;
+
+  let renderedText: React.ReactNode = scrubber.text?.textContent || "";
+
+  if (
+    scrubber.text?.template === "dynamic" &&
+    scrubber.text.words &&
+    scrubber.text.words.length > 0
+  ) {
+    // The sequence starts playing precisely at the start time of the first word in this chunk
+    // (with minor exceptions if trimmed). Thus, timeInSeconds represents the elapsed time
+    // since the first word's start.
+    const chunkStart = scrubber.text.words[0].start;
+    const currentVideoTime = timeInSeconds + chunkStart;
+
+    renderedText = scrubber.text.words.map((wordObj, i) => {
+      const isActive =
+        currentVideoTime >= wordObj.start && currentVideoTime <= wordObj.end;
+      return (
+        <span
+          key={i}
+          style={{
+            display: "inline-block",
+            transform: isActive ? "scale(1.15)" : "scale(1)",
+            color: isActive ? "white" : "rgba(255, 255, 255, 0.6)",
+            transition: "transform 0.1s ease, color 0.1s ease",
+            marginRight: i < scrubber.text!.words!.length - 1 ? "0.3em" : "0",
+          }}
+        >
+          {wordObj.text}
+        </span>
+      );
+    });
+  }
+
+  return (
+    <div
+      style={{
+        textAlign: scrubber.text?.textAlign || "center",
+        width: "100%",
+      }}
+    >
+      <p
+        style={{
+          color: scrubber.text?.color || "white",
+          fontSize: scrubber.text?.fontSize
+            ? `${scrubber.text.fontSize}px`
+            : "48px",
+          fontFamily: scrubber.text?.fontFamily || "Arial, sans-serif",
+          fontWeight: scrubber.text?.fontWeight || "normal",
+          margin: 0,
+          padding: "20px",
+        }}
+      >
+        {renderedText}
+      </p>
+    </div>
+  );
 };
 
 export function TimelineComposition({
@@ -94,7 +163,7 @@ export function TimelineComposition({
     let content: React.ReactNode = null;
 
     switch (scrubber.mediaType) {
-      case "text":
+      case "text": {
         content = (
           <AbsoluteFill
             style={{
@@ -106,30 +175,11 @@ export function TimelineComposition({
               alignItems: "center",
             }}
           >
-            <div
-              style={{
-                textAlign: scrubber.text?.textAlign || "center",
-                width: "100%",
-              }}
-            >
-              <p
-                style={{
-                  color: scrubber.text?.color || "white",
-                  fontSize: scrubber.text?.fontSize
-                    ? `${scrubber.text.fontSize}px`
-                    : "48px",
-                  fontFamily: scrubber.text?.fontFamily || "Arial, sans-serif",
-                  fontWeight: scrubber.text?.fontWeight || "normal",
-                  margin: 0,
-                  padding: "20px",
-                }}
-              >
-                {scrubber.text?.textContent || ""}
-              </p>
-            </div>
+            <DynamicText scrubber={scrubber} resolvedPixelsPerSecond={resolvedPixelsPerSecond} />
           </AbsoluteFill>
         );
         break;
+      }
       case "image": {
         const imageUrl = isRendering
           ? scrubber.mediaUrlRemote || scrubber.mediaUrlLocal
