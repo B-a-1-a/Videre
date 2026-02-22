@@ -205,6 +205,64 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+function rangesOverlap(startA: number, endA: number, startB: number, endB: number): boolean {
+  return startA <= endB && endA >= startB;
+}
+
+function getSuggestedCutWordIndexSet(
+  record: ClipTranscriptRecord,
+  suggestions: AnalysisSuggestion[]
+): Set<number> {
+  const validRanges = suggestions
+    .map((suggestion) => ({
+      startSec: Number(suggestion.startSec),
+      endSec: Number(suggestion.endSec),
+    }))
+    .filter(
+      (range) =>
+        Number.isFinite(range.startSec) &&
+        Number.isFinite(range.endSec) &&
+        range.endSec >= range.startSec
+    );
+
+  if (validRanges.length === 0) return new Set<number>();
+
+  const removedWordIndices = new Set<number>();
+  record.words.forEach((word, index) => {
+    if (!isValidTranscriptWord(word)) return;
+    const intersectsSuggestion = validRanges.some((range) =>
+      rangesOverlap(word.start, word.end, range.startSec, range.endSec)
+    );
+    if (intersectsSuggestion) {
+      removedWordIndices.add(index);
+    }
+  });
+  return removedWordIndices;
+}
+
+function buildEditedTranscriptFromSuggestions(
+  record: ClipTranscriptRecord,
+  suggestions: AnalysisSuggestion[]
+): { editedText: string; removedWordCount: number } {
+  const removedWordIndexSet = getSuggestedCutWordIndexSet(record, suggestions);
+  if (removedWordIndexSet.size === 0) {
+    return {
+      editedText: record.text || "",
+      removedWordCount: 0,
+    };
+  }
+
+  const keptWords = record.words
+    .map((word, index) => ({ word, index }))
+    .filter((entry) => !removedWordIndexSet.has(entry.index))
+    .map((entry) => entry.word.text);
+
+  return {
+    editedText: keptWords.join(" ").replace(/\s+/g, " ").trim(),
+    removedWordCount: removedWordIndexSet.size,
+  };
+}
+
 export default function Captions() {
   const {
     timeline,
@@ -561,6 +619,45 @@ export default function Captions() {
     },
     [clipTranscripts, editedTranscriptById, onApplyTranscriptEdit]
   );
+
+  const handleApplySuggestedCuts = useCallback(() => {
+    const scrubberId = analysisResults?.scrubberId;
+    if (!scrubberId) {
+      toast.error("No analyzed clip is selected.");
+      return;
+    }
+
+    const record = clipTranscripts[scrubberId];
+    if (!record || record.error) {
+      toast.error("Transcript is not available for suggested cuts.");
+      return;
+    }
+
+    if (!Array.isArray(record.words) || record.words.length === 0) {
+      toast.error("Word timestamps are required to apply suggested cuts.");
+      return;
+    }
+
+    const suggestions = analysisResults?.suggestions || [];
+    const { editedText, removedWordCount } = buildEditedTranscriptFromSuggestions(
+      record,
+      suggestions
+    );
+
+    if (removedWordCount === 0) {
+      toast.info("No suggested ranges matched transcript words.");
+      return;
+    }
+
+    setEditedTranscriptById((prev) => ({
+      ...prev,
+      [scrubberId]: editedText,
+    }));
+    setIsModalOpen(false);
+    toast.success(
+      `Marked ${removedWordCount} suggested word${removedWordCount === 1 ? "" : "s"} for removal.`
+    );
+  }, [analysisResults, clipTranscripts]);
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -932,7 +1029,15 @@ export default function Captions() {
         ) : (
           <p className="text-xs text-muted-foreground py-4 text-center">No suggestions found.</p>
         )}
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex justify-end gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleApplySuggestedCuts}
+            disabled={!analysisResults?.suggestions || analysisResults.suggestions.length === 0}
+          >
+            Apply Suggested Cuts
+          </Button>
           <Button size="sm" onClick={() => setIsModalOpen(false)}>Close</Button>
         </div>
       </Modal>

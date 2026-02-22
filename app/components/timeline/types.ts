@@ -107,6 +107,7 @@ export interface TimelineDataItem {
     // for video scrubbers (and audio in the future)
     trimBefore: number | null; // in frames
     trimAfter: number | null; // in frames
+    durationInSeconds: number; // full source media duration (needed for frame-exact trim math)
   })[];
   transitions: { [id: string]: Transition };
 }

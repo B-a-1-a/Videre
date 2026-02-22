@@ -43,6 +43,7 @@ export default function RenderComposition() {
                                 trackIndex: 0,
                                 trimBefore: null,
                                 trimAfter: null,
+                                durationInSeconds: 3,
                                 left_transition_id: null,
                                 right_transition_id: null,
                                 groupped_scrubbers: null,

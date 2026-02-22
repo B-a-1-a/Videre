@@ -205,6 +205,7 @@ export const useTimeline = () => {
           // for video scrubbers (and audio in the future)
           trimBefore: scrubber.trimBefore,
           trimAfter: scrubber.trimAfter,
+          durationInSeconds: scrubber.durationInSeconds,
 
           left_transition_id: scrubber.left_transition_id,
           right_transition_id: scrubber.right_transition_id,
@@ -851,20 +852,27 @@ export const useTimeline = () => {
         : currentTrimBefore + displayedDurationFrames + currentTrimAfter;
 
       // Create first scrubber (from start to split point)
+      const firstTrimAfter = originalDurationFrames - splitFrameInOriginal;
+      const firstPlayableFrames = Math.max(1, originalDurationFrames - currentTrimBefore - firstTrimAfter);
+      const firstWidth = (firstPlayableFrames / FPS) * pixelsPerSecond;
+
       const firstScrubber: ScrubberState = {
         ...selectedScrubber,
         id: generateUUID(),
-        width: splitOffsetTime * pixelsPerSecond,
+        width: firstWidth,
         trimBefore: currentTrimBefore,
-        trimAfter: originalDurationFrames - splitFrameInOriginal,
+        trimAfter: firstTrimAfter,
       };
 
       // Create second scrubber (from split point to end)
+      const secondPlayableFrames = Math.max(1, originalDurationFrames - splitFrameInOriginal - currentTrimAfter);
+      const secondWidth = (secondPlayableFrames / FPS) * pixelsPerSecond;
+
       const secondScrubber: ScrubberState = {
         ...selectedScrubber,
         id: generateUUID(),
-        left: selectedScrubber.left + splitOffsetTime * pixelsPerSecond,
-        width: (scrubberDuration - splitOffsetTime) * pixelsPerSecond,
+        left: selectedScrubber.left + firstWidth,
+        width: secondWidth,
         trimBefore: splitFrameInOriginal,
         trimAfter: currentTrimAfter,
       };
@@ -980,6 +988,7 @@ export const useTimeline = () => {
       }
 
       const pixelsPerSecond = getPixelsPerSecond();
+      const totalMediaFrames = Math.round(target.durationInSeconds * FPS);
       let nextLeft = target.left;
       const replacementScrubbers: ScrubberState[] = nonOverlapping
         .map((segment) => {
@@ -995,7 +1004,9 @@ export const useTimeline = () => {
             0,
             Math.round((target.durationInSeconds - endSec) * FPS)
           );
-          const width = Math.max(durationSec * pixelsPerSecond, pixelsPerSecond / FPS);
+          const playableFrames = Math.max(1, totalMediaFrames - trimBefore - trimAfter);
+          const frameAlignedDuration = playableFrames / FPS;
+          const width = Math.max(frameAlignedDuration * pixelsPerSecond, pixelsPerSecond / FPS);
           const newScrubber: ScrubberState = {
             ...target,
             id: generateUUID(),

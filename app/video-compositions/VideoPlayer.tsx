@@ -132,6 +132,26 @@ const DynamicText = ({
   );
 };
 
+function computeSequenceFrames(
+  trimBefore: number | null | undefined,
+  trimAfter: number | null | undefined,
+  durationInSeconds: number | undefined,
+  fallbackDurationSec: number
+): number {
+  const tb = trimBefore || 0;
+  const ta = trimAfter || 0;
+  if (
+    (tb > 0 || ta > 0) &&
+    durationInSeconds != null &&
+    Number.isFinite(durationInSeconds) &&
+    durationInSeconds > 0
+  ) {
+    const totalMediaFrames = Math.round(durationInSeconds * FPS);
+    return Math.max(1, totalMediaFrames - tb - ta);
+  }
+  return Math.max(Math.round(fallbackDurationSec * FPS), 1);
+}
+
 export function TimelineComposition({
   timelineData,
   isRendering,
@@ -396,7 +416,11 @@ export function TimelineComposition({
           scrubberStack.push({
             scrubber: grouppedScrubber,
             keyPrefix: `grouped-${grouppedScrubber.id}`,
-            durationCalculation: () => Math.max(Math.round((grouppedScrubber.width / resolvedPixelsPerSecond) * FPS), 1)
+            durationCalculation: () => computeSequenceFrames(
+              grouppedScrubber.trimBefore, grouppedScrubber.trimAfter,
+              grouppedScrubber.durationInSeconds,
+              grouppedScrubber.width / resolvedPixelsPerSecond
+            )
           });
 
           // Process the stack for this grouped scrubber
@@ -411,7 +435,11 @@ export function TimelineComposition({
                 scrubberStack.push({
                   scrubber: nestedScrubber,
                   keyPrefix: `${keyPrefix}-nested-${nestedScrubber.id}`,
-                  durationCalculation: () => Math.max(Math.round((nestedScrubber.width / resolvedPixelsPerSecond) * FPS), 1)
+                  durationCalculation: () => computeSequenceFrames(
+                    nestedScrubber.trimBefore, nestedScrubber.trimAfter,
+                    nestedScrubber.durationInSeconds,
+                    nestedScrubber.width / resolvedPixelsPerSecond
+                  )
                 });
               }
             } else {
@@ -454,7 +482,11 @@ export function TimelineComposition({
         scrubberStack.push({
           scrubber: scrubber,
           keyPrefix: `scrubber-${scrubber.id}`,
-          durationCalculation: () => Math.max(Math.round(scrubber.duration * FPS), 1)
+          durationCalculation: () => computeSequenceFrames(
+            scrubber.trimBefore, scrubber.trimAfter,
+            scrubber.durationInSeconds,
+            scrubber.duration
+          )
         });
 
         // Process the stack
@@ -469,7 +501,11 @@ export function TimelineComposition({
               scrubberStack.push({
                 scrubber: nestedScrubber,
                 keyPrefix: `${keyPrefix}-nested-${nestedScrubber.id}`,
-                durationCalculation: () => Math.max(Math.round((nestedScrubber.width / resolvedPixelsPerSecond) * FPS), 1)
+                durationCalculation: () => computeSequenceFrames(
+                  nestedScrubber.trimBefore, nestedScrubber.trimAfter,
+                  nestedScrubber.durationInSeconds,
+                  nestedScrubber.width / resolvedPixelsPerSecond
+                )
               });
             }
           } else {
