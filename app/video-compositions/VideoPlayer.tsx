@@ -239,19 +239,6 @@ export function TimelineComposition({
           console.warn("Skipping video scrubber with missing media URL", scrubber.id);
           break;
         }
-        const originalDurationFrames = Number.isFinite(scrubber.durationInSeconds)
-          ? Math.max(1, Math.round(Number(scrubber.durationInSeconds) * FPS))
-          : null;
-        const trimBeforeFrames = Math.max(0, Math.round(Number(scrubber.trimBefore || 0)));
-        const trimAfterFrames = Math.max(0, Math.round(Number(scrubber.trimAfter || 0)));
-        if (
-          originalDurationFrames !== null &&
-          trimBeforeFrames + trimAfterFrames >= originalDurationFrames
-        ) {
-          // #region agent log
-          fetch('http://127.0.0.1:7320/ingest/d71a00c7-2873-4c78-a303-0745571cd7ff',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89a021'},body:JSON.stringify({sessionId:'89a021',runId:'initial',hypothesisId:'H3',location:'VideoPlayer.tsx:createMediaContent:video',message:'Invalid video trim bounds detected before render',data:{scrubberId:scrubber.id,mediaType:scrubber.mediaType,durationInSeconds:scrubber.durationInSeconds,originalDurationFrames,trimBeforeFrames,trimAfterFrames,playbackRate},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
-        }
         content = (
           <AbsoluteFill
             style={{
@@ -278,19 +265,6 @@ export function TimelineComposition({
         if (!audioUrl) {
           console.warn("Skipping audio scrubber with missing media URL", scrubber.id);
           break;
-        }
-        const originalDurationFrames = Number.isFinite(scrubber.durationInSeconds)
-          ? Math.max(1, Math.round(Number(scrubber.durationInSeconds) * FPS))
-          : null;
-        const trimBeforeFrames = Math.max(0, Math.round(Number(scrubber.trimBefore || 0)));
-        const trimAfterFrames = Math.max(0, Math.round(Number(scrubber.trimAfter || 0)));
-        if (
-          originalDurationFrames !== null &&
-          trimBeforeFrames + trimAfterFrames >= originalDurationFrames
-        ) {
-          // #region agent log
-          fetch('http://127.0.0.1:7320/ingest/d71a00c7-2873-4c78-a303-0745571cd7ff',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89a021'},body:JSON.stringify({sessionId:'89a021',runId:'initial',hypothesisId:'H3',location:'VideoPlayer.tsx:createMediaContent:audio',message:'Invalid audio trim bounds detected before render',data:{scrubberId:scrubber.id,mediaType:scrubber.mediaType,durationInSeconds:scrubber.durationInSeconds,originalDurationFrames,trimBeforeFrames,trimAfterFrames,playbackRate},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
         }
         content = (
           <Audio

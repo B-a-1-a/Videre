@@ -138,7 +138,13 @@ function normalizeStorageKeyToFsPath(storageKey: string): string {
   return trimmed
     .split('/')
     .filter(Boolean)
-    .map((segment) => decodeURIComponent(segment))
+    .map((segment) => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    })
     .join(path.sep);
 }
 

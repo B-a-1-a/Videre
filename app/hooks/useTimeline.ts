@@ -869,10 +869,6 @@ export const useTimeline = () => {
         trimAfter: currentTrimAfter,
       };
 
-      // #region agent log
-      fetch('http://127.0.0.1:7320/ingest/d71a00c7-2873-4c78-a303-0745571cd7ff',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89a021'},body:JSON.stringify({sessionId:'89a021',runId:'initial',hypothesisId:'H2',location:'useTimeline.ts:handleSplitScrubberAtRuler',message:'Split scrubber computed frames and trims',data:{selectedScrubberId,splitTimeInSeconds,pixelsPerSecond,scrubberDuration,selectedPlaybackRate:selectedScrubber.playbackRate||1,currentTrimBefore,currentTrimAfter,originalDurationFrames,splitFrameOffset,splitFrameInOriginal,first:{id:firstScrubber.id,width:firstScrubber.width,trimBefore:firstScrubber.trimBefore,trimAfter:firstScrubber.trimAfter},second:{id:secondScrubber.id,width:secondScrubber.width,trimBefore:secondScrubber.trimBefore,trimAfter:secondScrubber.trimAfter}},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-
       // Apply the replacement in a single state update
       setTimeline((prev) => ({
         ...prev,
