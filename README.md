@@ -43,6 +43,7 @@ Videre is a local-first desktop video editor built with Tauri + React + TypeScri
 - Node.js `>=20.19` or `>=22.12` (Vite 7 requirement)
 - `pnpm` 10+
 - Rust toolchain (`rustup`, `cargo`)
+- Python 3.10+ (for nexa-caption-lab and nexa-video-context-lab)
 
 ### Desktop startup (recommended)
 

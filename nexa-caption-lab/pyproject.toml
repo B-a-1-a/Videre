@@ -12,9 +12,15 @@ dependencies = ["nexaai"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+local = ["faster-whisper"]
+qai = ["qai-hub-models[whisper-small]"]
+npu = ["onnxruntime-qnn", "transformers"]
 
 [project.scripts]
 nexa-caption = "nexa_caption_lab.caption_video:main"
+nexa-caption-local = "nexa_caption_lab.whisper_local:main"
+nexa-caption-qai = "nexa_caption_lab.whisper_qai:main"
+nexa-caption-npu = "nexa_caption_lab.whisper_npu:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
