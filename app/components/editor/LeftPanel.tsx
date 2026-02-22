@@ -1,8 +1,9 @@
 import React from "react";
 import { Link, Outlet, useLocation } from "react-router";
 import { FileImage, Type, BetweenVerticalEnd } from "lucide-react";
-import { type MediaBinItem } from "~/components/timeline/types";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { type MediaBinItem, type TimelineState } from "~/components/timeline/types";
+import type { ClipTranscriptsMap } from "~/components/media/captions.types";
+import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 
 interface LeftPanelProps {
   mediaBinItems: MediaBinItem[];
@@ -25,6 +26,11 @@ interface LeftPanelProps {
   handleDeleteFromContext: () => void;
   handleSplitAudioFromContext: () => void;
   handleCloseContextMenu: () => void;
+  timeline: TimelineState;
+  selectedScrubberIds: string[];
+  clipTranscripts: ClipTranscriptsMap;
+  onClipTranscriptsChange: React.Dispatch<React.SetStateAction<ClipTranscriptsMap>>;
+  projectId?: string;
 }
 
 export default function LeftPanel({
@@ -37,6 +43,11 @@ export default function LeftPanel({
   handleDeleteFromContext,
   handleSplitAudioFromContext,
   handleCloseContextMenu,
+  timeline,
+  selectedScrubberIds,
+  clipTranscripts,
+  onClipTranscriptsChange,
+  projectId,
 }: LeftPanelProps) {
   const location = useLocation();
 
@@ -68,6 +79,11 @@ export default function LeftPanel({
               handleDeleteFromContext,
               handleSplitAudioFromContext,
               handleCloseContextMenu,
+              timeline,
+              selectedScrubberIds,
+              clipTranscripts,
+              onClipTranscriptsChange,
+              projectId,
             }}
           />
         </div>

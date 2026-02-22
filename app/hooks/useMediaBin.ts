@@ -3,6 +3,11 @@ import axios from "axios"
 import { type MediaBinItem, type ScrubberState } from "~/components/timeline/types"
 import { generateUUID } from "~/utils/uuid"
 import { apiUrl } from "~/utils/api"
+import {
+  buildMediaUrl,
+  extractStorageKey,
+  normalizeMediaBinItems,
+} from "~/lib/media-persistence"
 
 // Delete media file from server
 export const deleteMediaFile = async (
@@ -39,6 +44,7 @@ export const cloneMediaFile = async (
 ): Promise<{
   success: boolean;
   filename?: string;
+  storageKey?: string;
   originalName?: string;
   url?: string;
   fullUrl?: string;
@@ -177,83 +183,14 @@ export const useMediaBin = (
     item: MediaBinItem;
   } | null>(null);
 
-  // Hydrate existing assets for the logged-in user
-  // DISABLED: Loading assets feature temporarily commented out
-  /*
-  useEffect(() => {
-    const loadAssets = async () => {
-      try {
-        const url = projectId
-          ? `/api/assets?projectId=${encodeURIComponent(projectId)}`
-          : "/api/assets";
-        const res = await fetch(apiUrl(url, false, true), {
-          credentials: "include",
-        });
-        if (!res.ok) return;
-        const json = await res.json();
-        const assets = (json.assets || []) as Array<{
-          id: string;
-          name: string;
-          mediaUrlRemote: string;
-          width: number | null;
-          height: number | null;
-          durationInSeconds: number | null;
-        }>;
-        const items: MediaBinItem[] = assets.map((a) => ({
-          id: a.id,
-          name: a.name,
-          mediaType: ((): "video" | "image" | "audio" | "text" => {
-            const ext = a.name.toLowerCase();
-            if (/(mp4|mov|webm|mkv|avi)$/.test(ext)) return "video";
-            if (/(mp3|wav|aac|ogg|flac)$/.test(ext)) return "audio";
-            if (/(jpg|jpeg|png|gif|bmp|webp)$/.test(ext)) return "image";
-            return "image";
-          })(),
-          mediaUrlLocal: null, // restored assets will use remote URL; local may be null
-          mediaUrlRemote: a.mediaUrlRemote,
-          durationInSeconds: a.durationInSeconds ?? 0,
-          media_width: a.width ?? 0,
-          media_height: a.height ?? 0,
-          text: null,
-          isUploading: false,
-          uploadProgress: null,
-          left_transition_id: null,
-          right_transition_id: null,
-        }));
-        // Merge: keep existing text items, replace non-text items with fetched assets
-        setMediaBinItems((prev) => {
-          const textItems = prev.filter((i) => i.mediaType === "text");
-          return [...textItems, ...items];
-        });
-      } catch (e) {
-        console.error("Failed to load assets", e);
-      } finally {
-        setIsMediaLoading(false);
-      }
-    };
-    loadAssets();
-  }, [projectId]);
-  */
-
-  // Manually set loading to false since we're not loading assets
+  // Hydration is driven by /api/projects/:id responses.
   useEffect(() => {
     setIsMediaLoading(false);
   }, []);
 
-  const getStorageKeyFromMediaUrl = useCallback((mediaUrl: string | null): string | null => {
-    if (!mediaUrl) return null;
-    try {
-      const parsed = new URL(mediaUrl, window.location.origin);
-      const parts = parsed.pathname.split("/").filter(Boolean);
-      const mediaIndex = parts.findIndex((part) => part === "media");
-      const keyParts = mediaIndex >= 0
-        ? parts.slice(mediaIndex + 1)
-        : parts.slice(parts.length - 1);
-      if (keyParts.length === 0) return null;
-      return keyParts.map((part) => decodeURIComponent(part)).join("/");
-    } catch {
-      return null;
-    }
+  const setMediaItems = useCallback((items: MediaBinItem[]) => {
+    setMediaBinItems(normalizeMediaBinItems(items));
+    setIsMediaLoading(false);
   }, []);
 
   const handleAddMediaToBin = useCallback(async (file: File) => {
@@ -284,6 +221,7 @@ export const useMediaBin = (
         mediaType,
         mediaUrlLocal,
         mediaUrlRemote: null, // Will be set after successful upload
+        storageKey: null,
         durationInSeconds: metadata.durationInSeconds ?? 0,
         media_width: metadata.width,
         media_height: metadata.height,
@@ -330,7 +268,9 @@ export const useMediaBin = (
           item.id === id
             ? {
               ...item,
-              mediaUrlRemote: uploadResult.fullUrl,
+              storageKey: uploadResult.storageKey || extractStorageKey(uploadResult.fullUrl) || null,
+              mediaUrlRemote: buildMediaUrl(uploadResult.storageKey || extractStorageKey(uploadResult.fullUrl) || null),
+              mediaUrlLocal: null,
               isUploading: false,
               uploadProgress: null
             }
@@ -374,6 +314,7 @@ export const useMediaBin = (
       },
       mediaUrlLocal: null,
       mediaUrlRemote: null,
+      storageKey: null,
       durationInSeconds: 0,     // interesting code. i wish i remembered why i did this. maybe there's a better way.
       isUploading: false,
       uploadProgress: null,
@@ -397,6 +338,7 @@ export const useMediaBin = (
             mediaType: "text" as const,
             mediaUrlLocal: null,
             mediaUrlRemote: null,
+            storageKey: null,
             isUploading: false,
             uploadProgress: null,
           })
@@ -414,13 +356,9 @@ export const useMediaBin = (
         if (handleDeleteScrubbersByMediaBinId) {
           handleDeleteScrubbersByMediaBinId(item.id);
         }
-
-        if (!item.mediaUrlRemote) {
-          console.error("No remote URL found for media item");
-          return;
-        }
+        return;
       }
-      const storageKey = getStorageKeyFromMediaUrl(item.mediaUrlRemote);
+      const storageKey = item.storageKey || extractStorageKey(item.mediaUrlRemote);
       if (!storageKey) {
         console.error("Could not resolve media filename");
         return;
@@ -442,7 +380,7 @@ export const useMediaBin = (
     } catch (error) {
       console.error("Error deleting media:", error);
     }
-  }, [getStorageKeyFromMediaUrl, handleDeleteScrubbersByMediaBinId]);
+  }, [handleDeleteScrubbersByMediaBinId]);
 
   const handleSplitAudio = useCallback(async (videoItem: MediaBinItem) => {
     if (videoItem.mediaType !== "video") {
@@ -450,7 +388,7 @@ export const useMediaBin = (
     }
 
     try {
-      const storageKey = getStorageKeyFromMediaUrl(videoItem.mediaUrlRemote);
+      const storageKey = videoItem.storageKey || extractStorageKey(videoItem.mediaUrlRemote);
       if (!storageKey) {
         throw new Error("No remote URL found for video item");
       }
@@ -468,8 +406,10 @@ export const useMediaBin = (
         id: generateUUID(),
         name: `${videoItem.name} (Audio)`,
         mediaType: "audio",
-        mediaUrlLocal: videoItem.mediaUrlLocal, // Reuse the original video's blob URL
-        mediaUrlRemote: cloneResult.fullUrl,
+        mediaUrlLocal: null,
+        mediaUrlRemote:
+          buildMediaUrl(cloneResult.storageKey || cloneResult.filename || null),
+        storageKey: cloneResult.storageKey || cloneResult.filename || null,
         durationInSeconds: videoItem.durationInSeconds,
         media_width: 0, // Audio doesn't have visual dimensions
         media_height: 0,
@@ -492,7 +432,7 @@ export const useMediaBin = (
       console.error("Error splitting audio:", error);
       throw error;
     }
-  }, [getStorageKeyFromMediaUrl]);
+  }, []);
 
   // Handle right-click to show context menu
   const handleContextMenu = useCallback(
@@ -537,6 +477,7 @@ export const useMediaBin = (
       mediaType: "groupped_scrubber",
       mediaUrlLocal: null,
       mediaUrlRemote: null,
+      storageKey: null,
       durationInSeconds: actualDurationInSeconds,
       media_width: groupedScrubber.media_width || 0,
       media_height: groupedScrubber.media_height || 0,
@@ -556,6 +497,7 @@ export const useMediaBin = (
     mediaBinItems,
     isMediaLoading,
     getMediaBinItems,
+    setMediaItems,
     setTextItems,
     handleAddMediaToBin,
     handleAddTextToBin,

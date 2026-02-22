@@ -8,9 +8,11 @@ import {
 } from "~/lib/projects.repo";
 import {
   loadProjectState,
+  type ProjectEditorState,
   saveProjectState,
 } from "~/lib/timeline.store";
 import type { MediaBinItem, TimelineState } from "~/components/timeline/types";
+import type { ClipTranscriptsMap } from "~/components/media/captions.types";
 
 export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);
@@ -37,7 +39,10 @@ export async function loader({ request }: { request: Request }) {
       JSON.stringify({
         project,
         timeline: state.timeline,
+        mediaBinItems: state.mediaBinItems,
         textBinItems: state.textBinItems,
+        clipTranscripts: state.clipTranscripts,
+        editorState: state.editorState,
       }),
       {
         status: 200,
@@ -89,13 +94,42 @@ export async function action({ request }: { request: Request }) {
       ? String(body.name).slice(0, 120)
       : undefined;
     const timeline: TimelineState | undefined = body?.timeline;
+    const mediaBinItems: MediaBinItem[] | undefined = Array.isArray(
+      body?.mediaBinItems
+    )
+      ? body.mediaBinItems
+      : undefined;
     const textBinItems: MediaBinItem[] | undefined = Array.isArray(
       body?.textBinItems
     )
       ? body.textBinItems
       : undefined;
+    const clipTranscripts: ClipTranscriptsMap | undefined =
+      body?.clipTranscripts &&
+      typeof body.clipTranscripts === "object" &&
+      !Array.isArray(body.clipTranscripts)
+        ? (body.clipTranscripts as ClipTranscriptsMap)
+        : undefined;
+    const editorState: ProjectEditorState | undefined =
+      body?.editorState &&
+      typeof body.editorState === "object" &&
+      !Array.isArray(body.editorState)
+        ? {
+            zoomLevel: Number((body.editorState as Record<string, unknown>).zoomLevel),
+            timelineWidth: Number(
+              (body.editorState as Record<string, unknown>).timelineWidth
+            ),
+          }
+        : undefined;
 
-    if (!name && !timeline && !textBinItems) {
+    if (
+      !name &&
+      !timeline &&
+      !mediaBinItems &&
+      !textBinItems &&
+      !clipTranscripts &&
+      !editorState
+    ) {
       return new Response(JSON.stringify({ error: "No changes" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
@@ -109,11 +143,21 @@ export async function action({ request }: { request: Request }) {
       }
     }
 
-    if (timeline || textBinItems) {
+    if (
+      timeline ||
+      mediaBinItems ||
+      textBinItems ||
+      clipTranscripts ||
+      editorState
+    ) {
       const prev = await loadProjectState(id);
       await saveProjectState(id, {
         timeline: timeline ?? prev.timeline,
+        mediaBinItems:
+          mediaBinItems ?? textBinItems ?? prev.mediaBinItems ?? prev.textBinItems,
         textBinItems: textBinItems ?? prev.textBinItems,
+        clipTranscripts: clipTranscripts ?? prev.clipTranscripts,
+        editorState: editorState ?? prev.editorState,
       });
     }
 

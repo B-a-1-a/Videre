@@ -161,6 +161,7 @@ export const useTimeline = () => {
           mediaType: scrubber.mediaType,
           mediaUrlLocal: scrubber.mediaUrlLocal,
           mediaUrlRemote: scrubber.mediaUrlRemote,
+          storageKey: scrubber.storageKey,
           width: scrubber.width,
           startTime: scrubber.left / pixelsPerSecond,
           endTime: (scrubber.left + scrubber.width) / pixelsPerSecond,
@@ -223,6 +224,34 @@ export const useTimeline = () => {
   const setTimelineFromServer = useCallback((newTimeline: TimelineState) => {
     setTimeline(newTimeline);
   }, []);
+
+  const getTimelineViewState = useCallback(() => {
+    return {
+      zoomLevel,
+      timelineWidth,
+    };
+  }, [zoomLevel, timelineWidth]);
+
+  const setTimelineViewState = useCallback(
+    (viewState: { zoomLevel?: number; timelineWidth?: number }) => {
+      if (
+        Number.isFinite(viewState.zoomLevel) &&
+        Number(viewState.zoomLevel) > 0
+      ) {
+        const normalizedZoom = Number(viewState.zoomLevel);
+        zoomLevelRef.current = normalizedZoom;
+        setZoomLevel(normalizedZoom);
+      }
+
+      if (
+        Number.isFinite(viewState.timelineWidth) &&
+        Number(viewState.timelineWidth) > 0
+      ) {
+        setTimelineWidth(Math.round(Number(viewState.timelineWidth)));
+      }
+    },
+    []
+  );
 
   const expandTimeline = useCallback(
     (containerRef: React.RefObject<HTMLDivElement | null>) => {
@@ -624,6 +653,7 @@ export const useTimeline = () => {
         mediaType: item.mediaType,
         mediaUrlLocal: item.mediaUrlLocal,
         mediaUrlRemote: item.mediaUrlRemote,
+        storageKey: item.storageKey,
         y: targetTrackIndex,
         name: item.name,
         durationInSeconds: item.durationInSeconds,
@@ -1493,6 +1523,7 @@ export const useTimeline = () => {
         mediaType: "groupped_scrubber",
         mediaUrlLocal: null,
         mediaUrlRemote: null,
+        storageKey: null,
         media_width: rightmost - leftmost,
         media_height: 60,
         text: null,
@@ -1575,6 +1606,7 @@ export const useTimeline = () => {
         mediaType: id.mediaType,
         mediaUrlLocal: id.mediaUrlLocal,
         mediaUrlRemote: id.mediaUrlRemote,
+        storageKey: id.storageKey,
         media_width: id.media_width,
         media_height: id.media_height,
         text: id.text,
@@ -1675,6 +1707,8 @@ export const useTimeline = () => {
     getConnectedElements,
     handleUpdateScrubberWithLocking,
     setTimelineFromServer,
+    getTimelineViewState,
+    setTimelineViewState,
     // Undo/redo
     undo,
     redo,

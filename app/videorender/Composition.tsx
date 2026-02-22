@@ -26,6 +26,7 @@ export default function RenderComposition() {
                                 media_height: 80,
                                 mediaUrlLocal: null,
                                 mediaUrlRemote: null,
+                                storageKey: null,
                                 text: {
                                     textContent: "Hello, world!",
                                     fontSize: 16,

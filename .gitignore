@@ -22,6 +22,10 @@ src-tauri/binaries/*
 *.db
 *.db-shm
 *.db-wal
+__pycache__/
+*.pyc
+.venv-whisper
+.venv
 
 # Editor directories and files
 .vscode/*

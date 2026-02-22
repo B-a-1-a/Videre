@@ -5,7 +5,6 @@ import {
   Pause,
   Upload,
   Download,
-  FileImage,
   Settings,
   Plus,
   Minus,
@@ -24,6 +23,7 @@ import { VideoPlayer } from "~/video-compositions/VideoPlayer";
 import { RenderStatus } from "~/components/timeline/RenderStatus";
 import { TimelineRuler } from "~/components/timeline/TimelineRuler";
 import { TimelineTracks } from "~/components/timeline/TimelineTracks";
+import { MediaBinView } from "~/components/timeline/MediaBin";
 import { Button } from "~/components/ui/button";
 import { ProfileMenu } from "~/components/ui/ProfileMenu";
 import { Badge } from "~/components/ui/badge";
@@ -44,14 +44,20 @@ import { useRenderer } from "~/hooks/useRenderer";
 import {
   FPS,
   type MediaBinItem,
+  type TimelineState,
   type Transition,
-  type TrackState,
-  type ScrubberState,
 } from "~/components/timeline/types";
-import { Link, useNavigate, useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { ChatBox } from "~/components/chat/ChatBox";
 import { VidereLogo } from "~/components/ui/VidereLogo";
 import { useAuth } from "~/hooks/useAuth";
+import type { ClipTranscriptsMap } from "~/components/media/captions.types";
+import {
+  normalizeMediaBinItems,
+  reconcileTimelineWithMediaBin,
+  sanitizeMediaBinItemsForPersistence,
+  sanitizeTimelineForPersistence,
+} from "~/lib/media-persistence";
 
 interface Message {
   id: string;
@@ -59,6 +65,15 @@ interface Message {
   isUser: boolean;
   timestamp: Date;
 }
+
+const EMPTY_TIMELINE: TimelineState = {
+  tracks: [
+    { id: "track-1", scrubbers: [], transitions: [] },
+    { id: "track-2", scrubbers: [], transitions: [] },
+    { id: "track-3", scrubbers: [], transitions: [] },
+    { id: "track-4", scrubbers: [], transitions: [] },
+  ],
+};
 
 export default function TimelineEditor() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -93,6 +108,7 @@ export default function TimelineEditor() {
   // Avoid initial blank render; don't delay render on a 'mounted' gate
 
   const [selectedScrubberIds, setSelectedScrubberIds] = useState<string[]>([]);
+  const [clipTranscripts, setClipTranscripts] = useState<ClipTranscriptsMap>({});
 
   // video player media selection state
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
@@ -125,6 +141,8 @@ export default function TimelineEditor() {
     getConnectedElements,
     handleUpdateScrubberWithLocking,
     setTimelineFromServer,
+    getTimelineViewState,
+    setTimelineViewState,
     // undo/redo
     undo,
     redo,
@@ -137,7 +155,7 @@ export default function TimelineEditor() {
     mediaBinItems,
     isMediaLoading,
     getMediaBinItems,
-    setTextItems,
+    setMediaItems,
     handleAddMediaToBin,
     handleAddTextToBin,
     handleAddGroupToMediaBin,
@@ -188,136 +206,226 @@ export default function TimelineEditor() {
     fileInputRef.current?.click();
   }, []);
 
-  // Hydrate project name and timeline from API
-  useEffect(() => {
-    (async () => {
-      const id = projectId || (window.location.pathname.match(/\/project\/([^/]+)/)?.[1] ?? "");
-      if (!id) return;
-      const res = await fetch(`/api/projects/${encodeURIComponent(id)}`);
-      if (!res.ok) {
-        navigate("/projects");
-        return;
-      }
-      const j = await res.json();
-      setProjectName(j.project?.name || "Project");
-      if (j.timeline) setTimelineFromServer(j.timeline);
-      // Use saved textBinItems if present, else extract from timeline
-      try {
-        if (Array.isArray(j.textBinItems) && j.textBinItems.length) {
-          const textItems: typeof mediaBinItems = j.textBinItems.map((t: MediaBinItem) => ({
-            id: t.id,
-            name: t.name,
-            mediaType: "text" as const,
-            media_width: Number(t.media_width) || 0,
-            media_height: Number(t.media_height) || 0,
-            text: t.text || null,
-            mediaUrlLocal: null,
-            mediaUrlRemote: null,
-            durationInSeconds: Number(t.durationInSeconds) || 0,
-            isUploading: false,
-            uploadProgress: null,
-            left_transition_id: null,
-            right_transition_id: null,
-            groupped_scrubbers: t.groupped_scrubbers || null,
-          }));
-          setTextItems(textItems);
-        } else {
-          const perTrack = (j.timeline?.tracks || []).flatMap((t: TrackState) => t.scrubbers || []);
-          const rootScrubbers = Array.isArray(j.timeline?.scrubbers) ? (j.timeline!.scrubbers as ScrubberState[]) : [];
-          const allScrubbers: ScrubberState[] = [...rootScrubbers, ...perTrack];
-          const textItems: typeof mediaBinItems = (allScrubbers || [])
-            .filter((s: ScrubberState) => s && s.mediaType === "text" && s.text)
-            .map((s: ScrubberState) => ({
-              id: s.sourceMediaBinId || s.id,
-              name: s.text?.textContent || "Text",
-              mediaType: "text" as const,
-              media_width: s.media_width || 0,
-              media_height: s.media_height || 0,
-              text: s.text || null,
-              mediaUrlLocal: null,
-              mediaUrlRemote: null,
-              durationInSeconds: s.durationInSeconds || 0,
-              isUploading: false,
-              uploadProgress: null,
-              left_transition_id: null,
-              right_transition_id: null,
-              groupped_scrubbers: null,
-            }));
-          if (textItems.length) setTextItems(textItems);
-        }
-      } catch {
-        console.error("Failed to load project");
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const [hasHydratedProject, setHasHydratedProject] = useState(false);
+  const lastPersistedSignatureRef = useRef<string>("");
+  const isPersistingRef = useRef(false);
+
+  const resolveProjectId = useCallback(() => {
+    return (
+      projectId ||
+      window.location.pathname.match(/\/project\/([^/]+)/)?.[1] ||
+      ""
+    );
   }, [projectId]);
 
-  // Re-link scrubbers to remote asset URLs after assets hydrate
-  // Ensures images/videos/audios render after refresh (when local blob URLs are gone)
-  useEffect(() => {
-    if (isMediaLoading) return;
-    if (!mediaBinItems || mediaBinItems.length === 0) return;
+  type PersistPayload = {
+    timeline: TimelineState;
+    mediaBinItems: MediaBinItem[];
+    clipTranscripts: ClipTranscriptsMap;
+    editorState: { zoomLevel: number; timelineWidth: number };
+  };
 
-    const current = getTimelineState();
-    let changed = false;
-
-    const assetsByName = new Map(
-      mediaBinItems.filter((i) => i.mediaType !== "text" && i.mediaUrlRemote).map((i) => [i.name, i]),
+  const buildPersistPayload = useCallback((): PersistPayload => {
+    const mediaPayload = sanitizeMediaBinItemsForPersistence(getMediaBinItems());
+    const timelinePayload = sanitizeTimelineForPersistence(
+      getTimelineState(),
+      mediaPayload
     );
+    const editorState = getTimelineViewState();
+    return {
+      timeline: timelinePayload,
+      mediaBinItems: mediaPayload,
+      clipTranscripts,
+      editorState,
+    };
+  }, [
+    clipTranscripts,
+    getMediaBinItems,
+    getTimelineState,
+    getTimelineViewState,
+  ]);
 
-    const newTracks = current.tracks.map((track) => ({
-      ...track,
-      scrubbers: track.scrubbers.map((s) => {
-        if (s.mediaType === "text") return s;
-        if (!s.mediaUrlRemote) {
-          const match = assetsByName.get(s.name);
-          if (match && match.mediaUrlRemote) {
-            changed = true;
-            return {
-              ...s,
-              mediaUrlRemote: match.mediaUrlRemote,
-              sourceMediaBinId: match.id,
-              media_width: match.media_width || s.media_width,
-              media_height: match.media_height || s.media_height,
-            };
-          }
-        }
-        return s;
-      }),
-    }));
-
-    if (changed) {
-      setTimelineFromServer({ ...current, tracks: newTracks });
-    }
-  }, [isMediaLoading, mediaBinItems, getTimelineState, setTimelineFromServer]);
-
-  // Save timeline to server
-  const handleSaveTimeline = useCallback(async () => {
-    try {
-      toast.info("Saving state of the project...");
-      const id = projectId || (window.location.pathname.match(/\/project\/([^/]+)/)?.[1] ?? "");
+  const persistProjectState = useCallback(
+    async ({
+      silent = false,
+      keepalive = false,
+    }: { silent?: boolean; keepalive?: boolean } = {}) => {
+      const id = resolveProjectId();
       if (!id) {
-        toast.error("No project ID");
+        if (!silent) toast.error("No project ID");
+        return false;
+      }
+
+      const payload = buildPersistPayload();
+      const signature = JSON.stringify(payload);
+      if (signature === lastPersistedSignatureRef.current) {
+        if (!silent) {
+          toast.success("Timeline already saved");
+        }
+        return true;
+      }
+
+      if (isPersistingRef.current) {
+        return false;
+      }
+      isPersistingRef.current = true;
+
+      try {
+        if (!silent) {
+          toast.info("Saving state of the project...");
+        }
+        const res = await fetch(`/api/projects/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          keepalive,
+        });
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
+        lastPersistedSignatureRef.current = signature;
+        if (!silent) {
+          toast.success("Timeline saved");
+        }
+        return true;
+      } catch (error) {
+        console.error(error);
+        if (!silent) {
+          toast.error("Failed to save");
+        }
+        return false;
+      } finally {
+        isPersistingRef.current = false;
+      }
+    },
+    [buildPersistPayload, resolveProjectId]
+  );
+
+  // Hydrate project state.
+  useEffect(() => {
+    let cancelled = false;
+    setHasHydratedProject(false);
+
+    (async () => {
+      const id = resolveProjectId();
+      if (!id) return;
+
+      const res = await fetch(`/api/projects/${encodeURIComponent(id)}`);
+      if (!res.ok) {
+        if (!cancelled) navigate("/projects");
         return;
       }
-      const timelineState = getTimelineState();
-      // persist current text items alongside timeline
-      const textItemsPayload = getMediaBinItems().filter((i) => i.mediaType === "text");
-      const res = await fetch(`/api/projects/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          timeline: timelineState,
-          textBinItems: textItemsPayload,
-        }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      toast.success("Timeline saved");
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to save");
-    }
-  }, [getMediaBinItems, getTimelineState, projectId]);
+
+      const payload = (await res.json()) as {
+        project?: { name?: string };
+        timeline?: TimelineState;
+        mediaBinItems?: MediaBinItem[];
+        textBinItems?: MediaBinItem[];
+        clipTranscripts?: ClipTranscriptsMap;
+        editorState?: { zoomLevel?: number; timelineWidth?: number };
+      };
+
+      if (cancelled) return;
+
+      setProjectName(payload.project?.name || "Project");
+      const hydratedMediaBinItems = normalizeMediaBinItems(
+        Array.isArray(payload.mediaBinItems)
+          ? payload.mediaBinItems
+          : Array.isArray(payload.textBinItems)
+            ? payload.textBinItems
+            : []
+      );
+      setMediaItems(hydratedMediaBinItems);
+
+      const hydratedTimeline = reconcileTimelineWithMediaBin(
+        payload.timeline ?? EMPTY_TIMELINE,
+        hydratedMediaBinItems
+      );
+      setTimelineFromServer(hydratedTimeline);
+
+      const hydratedClipTranscripts =
+        payload.clipTranscripts &&
+        typeof payload.clipTranscripts === "object" &&
+        !Array.isArray(payload.clipTranscripts)
+          ? payload.clipTranscripts
+          : {};
+      setClipTranscripts(hydratedClipTranscripts);
+
+      const viewState = {
+        zoomLevel:
+          Number.isFinite(Number(payload.editorState?.zoomLevel)) &&
+          Number(payload.editorState?.zoomLevel) > 0
+            ? Number(payload.editorState?.zoomLevel)
+            : 1,
+        timelineWidth:
+          Number.isFinite(Number(payload.editorState?.timelineWidth)) &&
+          Number(payload.editorState?.timelineWidth) > 0
+            ? Math.round(Number(payload.editorState?.timelineWidth))
+            : 2000,
+      };
+      setTimelineViewState(viewState);
+
+      const hydratedPayload: PersistPayload = {
+        timeline: sanitizeTimelineForPersistence(
+          hydratedTimeline,
+          hydratedMediaBinItems
+        ),
+        mediaBinItems: sanitizeMediaBinItemsForPersistence(hydratedMediaBinItems),
+        clipTranscripts: hydratedClipTranscripts,
+        editorState: viewState,
+      };
+      lastPersistedSignatureRef.current = JSON.stringify(hydratedPayload);
+      setHasHydratedProject(true);
+    })().catch((error) => {
+      console.error("Failed to load project", error);
+      if (!cancelled) navigate("/projects");
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    navigate,
+    projectId,
+    resolveProjectId,
+    setMediaItems,
+    setTimelineFromServer,
+    setTimelineViewState,
+  ]);
+
+  // Debounced autosave after hydration.
+  useEffect(() => {
+    if (!hasHydratedProject) return;
+    const timeout = window.setTimeout(() => {
+      void persistProjectState({ silent: true });
+    }, 1000);
+    return () => window.clearTimeout(timeout);
+  }, [
+    clipTranscripts,
+    hasHydratedProject,
+    mediaBinItems,
+    persistProjectState,
+    timeline,
+    timelineWidth,
+    zoomLevel,
+  ]);
+
+  // Best-effort save on window close/navigation.
+  useEffect(() => {
+    if (!hasHydratedProject) return;
+    const flush = () => {
+      void persistProjectState({ silent: true, keepalive: true });
+    };
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [hasHydratedProject, persistProjectState]);
+
+  const handleSaveTimeline = useCallback(async () => {
+    await persistProjectState({ silent: false });
+  }, [persistProjectState]);
 
   // Global Ctrl/Cmd+S to save timeline (registered after handler is defined)
   useEffect(() => {
@@ -719,6 +827,11 @@ export default function TimelineEditor() {
               handleDeleteFromContext={handleDeleteFromContext}
               handleSplitAudioFromContext={handleSplitAudioFromContext}
               handleCloseContextMenu={handleCloseContextMenu}
+              timeline={timeline}
+              selectedScrubberIds={selectedScrubberIds}
+              clipTranscripts={clipTranscripts}
+              onClipTranscriptsChange={setClipTranscripts}
+              projectId={projectId}
             />
           </div>
         </ResizablePanel>
@@ -795,24 +908,6 @@ export default function TimelineEditor() {
                     {isChatMinimized && (
                       <>
                         <Separator orientation="vertical" className="h-4 mx-1" />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          asChild
-                          className="h-6 px-2 text-xs"
-                          title="Open Media"
-                        >
-                          <Link
-                            to={
-                              projectId
-                                ? `/project/${encodeURIComponent(projectId)}/media-bin`
-                                : "/projects"
-                            }
-                          >
-                            <FileImage className="h-3 w-3 mr-1" />
-                            Media
-                          </Link>
-                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -987,43 +1082,73 @@ export default function TimelineEditor() {
           </ResizablePanelGroup>
         </ResizablePanel>
 
-        {/* Right Panel - Chat (toggleable) */}
-        {!isChatMinimized && (
-          <>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={20} minSize={15} maxSize={35}>
-              <div className="h-full border-l border-border flex flex-col">
-                <div className="flex-1 min-h-0">
-                  <ChatBox
-                    mediaBinItems={mediaBinItems}
-                    handleDropOnTrack={handleDropOnTrack}
-                    isMinimized={false}
-                    onToggleMinimize={() => setIsChatMinimized(true)}
-                    messages={chatMessages}
-                    onMessagesChange={setChatMessages}
-                    timelineState={timeline}
-                    handleUpdateScrubber={handleUpdateScrubberWithLocking}
-                    handleDeleteScrubber={handleDeleteScrubber}
-                  />
-                </div>
-                <div className="h-10 border-t border-border/60 bg-background/95 px-2 flex items-center justify-end">
-                  <Button variant="ghost" size="sm" asChild className="h-7 px-2 text-xs">
-                    <Link
-                      to={
-                        projectId
-                          ? `/project/${encodeURIComponent(projectId)}/media-bin`
-                          : "/projects"
-                      }
-                    >
-                      <FileImage className="h-3.5 w-3.5 mr-1" />
-                      Media
-                    </Link>
+        {/* Right Panel - Chat + Media */}
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={25} minSize={18} maxSize={40}>
+          <div className="h-full border-l border-border flex flex-col">
+            {isChatMinimized ? (
+              <div className="h-full min-h-0 relative">
+                <div className="absolute top-2 right-2 z-10">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setIsChatMinimized(false)}
+                    className="h-6 px-2 text-xs"
+                  >
+                    Open Chat
                   </Button>
                 </div>
+                <MediaBinView
+                  mediaBinItems={mediaBinItems}
+                  isMediaLoading={isMediaLoading}
+                  onAddMedia={handleAddMediaToBin}
+                  onAddText={handleAddTextToBin}
+                  contextMenu={contextMenu}
+                  handleContextMenu={handleContextMenu}
+                  handleDeleteFromContext={handleDeleteFromContext}
+                  handleSplitAudioFromContext={handleSplitAudioFromContext}
+                  handleCloseContextMenu={handleCloseContextMenu}
+                  itemLayout="grid"
+                />
               </div>
-            </ResizablePanel>
-          </>
-        )}
+            ) : (
+              <ResizablePanelGroup direction="vertical" className="h-full">
+                <ResizablePanel defaultSize={52} minSize={25}>
+                  <div className="h-full min-h-0">
+                    <ChatBox
+                      mediaBinItems={mediaBinItems}
+                      handleDropOnTrack={handleDropOnTrack}
+                      isMinimized={false}
+                      onToggleMinimize={() => setIsChatMinimized(true)}
+                      messages={chatMessages}
+                      onMessagesChange={setChatMessages}
+                      timelineState={timeline}
+                      handleUpdateScrubber={handleUpdateScrubberWithLocking}
+                      handleDeleteScrubber={handleDeleteScrubber}
+                    />
+                  </div>
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={48} minSize={25}>
+                  <div className="h-full min-h-0 border-t border-border/50">
+                    <MediaBinView
+                      mediaBinItems={mediaBinItems}
+                      isMediaLoading={isMediaLoading}
+                      onAddMedia={handleAddMediaToBin}
+                      onAddText={handleAddTextToBin}
+                      contextMenu={contextMenu}
+                      handleContextMenu={handleContextMenu}
+                      handleDeleteFromContext={handleDeleteFromContext}
+                      handleSplitAudioFromContext={handleSplitAudioFromContext}
+                      handleCloseContextMenu={handleCloseContextMenu}
+                      itemLayout="grid"
+                    />
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            )}
+          </div>
+        </ResizablePanel>
       </ResizablePanelGroup>
 
       {/* Hidden file input */}

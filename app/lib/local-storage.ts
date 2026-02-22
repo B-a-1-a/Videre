@@ -94,3 +94,51 @@ export function getDirectorySizeBytes(targetDir: string): number {
   }
   return total;
 }
+
+export type ProjectMediaFile = {
+  storageKey: string;
+  name: string;
+  absolutePath: string;
+  size: number;
+  modifiedAt: string;
+};
+
+export function listProjectMediaFiles(projectId: string): ProjectMediaFile[] {
+  const sanitizedProjectId = sanitizeId(projectId);
+  const projectDir = getProjectMediaDir(sanitizedProjectId);
+  if (!fs.existsSync(projectDir)) return [];
+
+  const root = path.resolve(projectDir);
+  const stack = [root];
+  const files: ProjectMediaFile[] = [];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    const entries = fs.readdirSync(current, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const absolutePath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(absolutePath);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+
+      const relativePath = path.relative(root, absolutePath);
+      if (!relativePath || relativePath.startsWith("..")) continue;
+      const stats = fs.statSync(absolutePath);
+      const projectRelativePath = relativePath.split(path.sep).join("/");
+      files.push({
+        storageKey: `${sanitizedProjectId}/${projectRelativePath}`,
+        name: entry.name,
+        absolutePath,
+        size: stats.size,
+        modifiedAt: stats.mtime.toISOString(),
+      });
+    }
+  }
+
+  files.sort((a, b) => a.storageKey.localeCompare(b.storageKey));
+  return files;
+}

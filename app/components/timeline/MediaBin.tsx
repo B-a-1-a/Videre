@@ -34,7 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 
-interface MediaBinProps {
+export interface MediaBinProps {
   mediaBinItems: MediaBinItem[];
   isMediaLoading?: boolean;
   onAddMedia: (file: File) => Promise<void>;
@@ -55,6 +55,10 @@ interface MediaBinProps {
   handleDeleteFromContext: () => Promise<void>;
   handleSplitAudioFromContext: () => Promise<void>;
   handleCloseContextMenu: () => void;
+}
+
+interface MediaBinViewProps extends MediaBinProps {
+  itemLayout?: "list" | "grid";
 }
 
 // Memoized component for video thumbnails to prevent flickering
@@ -235,18 +239,18 @@ export function loader() {
   return null;
 }
 
-export default function MediaBin() {
-  const {
-    mediaBinItems,
-    isMediaLoading,
-    onAddMedia,
-    onAddText,
-    contextMenu,
-    handleContextMenu,
-    handleDeleteFromContext,
-    handleSplitAudioFromContext,
-    handleCloseContextMenu,
-  } = useOutletContext<MediaBinProps>();
+export function MediaBinView({
+  mediaBinItems,
+  isMediaLoading,
+  onAddMedia,
+  onAddText,
+  contextMenu,
+  handleContextMenu,
+  handleDeleteFromContext,
+  handleSplitAudioFromContext,
+  handleCloseContextMenu,
+  itemLayout = "list",
+}: MediaBinViewProps) {
 
   // Drag & Drop state for external file imports
   const [isDragOver, setIsDragOver] = useState(false);
@@ -267,6 +271,7 @@ export default function MediaBin() {
     audio: false,
     text: false,
   });
+  const useGridLayout = itemLayout === "grid";
 
   const handleDragOverRoot = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
@@ -639,76 +644,84 @@ export default function MediaBin() {
         )}
         {arrangeMode === "default" && (
           <>
-            {defaultArrangedItems.map((item) => (
-              <div
-                key={item.id}
-                className={`group p-2 border border-border/50 rounded-md transition-colors ${item.isUploading
-                  ? "bg-accent/30 cursor-default"
-                  : "bg-card cursor-grab hover:bg-accent/50"
-                  }`}
-                draggable={!item.isUploading}
-                onDragStart={(e) => {
-                  if (!item.isUploading) {
-                    e.dataTransfer.setData(
-                      "application/json",
-                      JSON.stringify(item)
-                    );
-                    console.log("Dragging item:", item.name);
-                  }
-                }}
-                onContextMenu={(e) => handleContextMenu(e, item)}
-                onDoubleClick={() => openPreview(item)}
-              >
-                <div className="flex items-start gap-2">
-                  <div className="flex-shrink-0">{renderThumbnail(item)}</div>
+            <div
+              className={
+                useGridLayout
+                  ? "grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-2"
+                  : "space-y-1"
+              }
+            >
+              {defaultArrangedItems.map((item) => (
+                <div
+                  key={item.id}
+                  className={`group p-2 border border-border/50 rounded-md transition-colors ${item.isUploading
+                    ? "bg-accent/30 cursor-default"
+                    : "bg-card cursor-grab hover:bg-accent/50"
+                    }`}
+                  draggable={!item.isUploading}
+                  onDragStart={(e) => {
+                    if (!item.isUploading) {
+                      e.dataTransfer.setData(
+                        "application/json",
+                        JSON.stringify(item)
+                      );
+                      console.log("Dragging item:", item.name);
+                    }
+                  }}
+                  onContextMenu={(e) => handleContextMenu(e, item)}
+                  onDoubleClick={() => openPreview(item)}
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="flex-shrink-0">{renderThumbnail(item)}</div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p
-                        className={`text-xs font-medium truncate transition-colors ${item.isUploading
-                          ? "text-muted-foreground"
-                          : "text-foreground group-hover:text-accent-foreground"
-                          }`}
-                      >
-                        {item.name}
-                      </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p
+                          className={`text-xs font-medium truncate transition-colors ${item.isUploading
+                            ? "text-muted-foreground"
+                            : "text-foreground group-hover:text-accent-foreground"
+                            }`}
+                        >
+                          {item.name}
+                        </p>
+
+                        {item.isUploading &&
+                          typeof item.uploadProgress === "number" && (
+                            <span className="text-xs text-muted-foreground font-mono">
+                              {item.uploadProgress}%
+                            </span>
+                          )}
+                      </div>
 
                       {item.isUploading &&
                         typeof item.uploadProgress === "number" && (
-                          <span className="text-xs text-muted-foreground font-mono">
-                            {item.uploadProgress}%
-                          </span>
+                          <div className="mt-1 mb-1">
+                            <Progress
+                              value={item.uploadProgress}
+                              className="h-1"
+                            />
+                          </div>
                         )}
-                    </div>
 
-                    {item.isUploading &&
-                      typeof item.uploadProgress === "number" && (
-                        <div className="mt-1 mb-1">
-                          <Progress
-                            value={item.uploadProgress}
-                            className="h-1"
-                          />
-                        </div>
-                      )}
-
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <Badge
-                        variant="secondary"
-                        className="text-xs px-1 py-0 h-auto"
-                      >
-                        {item.isUploading ? "uploading" : item.mediaType}
-                      </Badge>
-                      {(item.mediaType === "video" || item.mediaType === "audio" || item.mediaType === "groupped_scrubber") && item.durationInSeconds > 0 && !item.isUploading && (
-                        <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
-                          <Clock className="h-2.5 w-2.5" />
-                          {item.durationInSeconds.toFixed(1)}s
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <Badge
+                          variant="secondary"
+                          className="text-xs px-1 py-0 h-auto"
+                        >
+                          {item.isUploading ? "uploading" : item.mediaType}
+                        </Badge>
+                        {(item.mediaType === "video" || item.mediaType === "audio" || item.mediaType === "groupped_scrubber") && item.durationInSeconds > 0 && !item.isUploading && (
+                          <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                            <Clock className="h-2.5 w-2.5" />
+                            {item.durationInSeconds.toFixed(1)}s
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
 
             {defaultArrangedItems.length === 0 && (
               <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -802,7 +815,13 @@ export default function MediaBin() {
                     </div>
                   </button>
                   {!collapsed[section.key] && (
-                    <div className="p-2 space-y-1.5">
+                    <div
+                      className={
+                        useGridLayout
+                          ? "p-2 grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-1.5"
+                          : "p-2 space-y-1.5"
+                      }
+                    >
                       {section.items.map((item) => (
                         <div
                           key={item.id}
@@ -1021,4 +1040,9 @@ export default function MediaBin() {
       )}
     </div>
   );
+}
+
+export default function MediaBin() {
+  const context = useOutletContext<MediaBinProps>();
+  return <MediaBinView {...context} />;
 }

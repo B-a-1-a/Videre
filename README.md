@@ -30,6 +30,7 @@ You can override paths with:
 
 - Node.js 20+
 - `pnpm`
+- `ffmpeg` available on your `PATH`
 
 ### Start Desktop App
 
@@ -59,6 +60,37 @@ Shortcut:
 - `pnpm preview` - Serve production build locally
 - `pnpm typecheck` - Type generation + TypeScript checks
 - `pnpm lint` - ESLint checks
+
+## Local Whisper Setup
+
+The Captions tab uses a local Python runner with
+`transformers` + `openai/whisper-small`.
+
+### Install Python Dependencies
+
+Use a Python version supported by your local `torch` build
+(Python 3.11/3.12 is recommended).
+
+```bash
+python3.12 -m venv .venv-whisper
+source .venv-whisper/bin/activate
+pip install -r app/videorender/requirements-whisper.txt
+```
+
+The render server auto-detects `.venv-whisper/bin/python` first. If you use a
+different interpreter path, set `VIDERE_WHISPER_PYTHON`.
+
+### Optional Environment Overrides
+
+- `VIDERE_WHISPER_PYTHON` (default: `python3`)
+- `VIDERE_WHISPER_MODEL` (default: `openai/whisper-small`)
+- `VIDERE_WHISPER_DEVICE` (default: `auto`)
+- `VIDERE_WHISPER_FFMPEG_BIN` (default: `ffmpeg`)
+
+### First Run Behavior
+
+The first transcription request downloads the Whisper model weights and may
+take noticeably longer than subsequent runs.
 
 ## Notes
 

@@ -5,11 +5,56 @@ import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import fs from 'fs';
 import multer from 'multer';
+import { spawn, spawnSync } from 'child_process';
 
 // The composition you want to render
 const compositionId = 'TimelineComposition';
 const OUT_DIR = path.resolve(process.env.VIDERE_MEDIA_DIR || 'out');
 const PROJECT_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+const FPS = 30;
+const DEFAULT_WHISPER_MODEL =
+  process.env.VIDERE_WHISPER_MODEL || 'openai/whisper-small';
+const DEFAULT_WHISPER_TIMESTAMPS = 'word';
+const WHISPER_SCRIPT_PATH = path.resolve('./app/videorender/whisper_transcribe.py');
+const WHISPER_REQUIREMENTS_PATH = path.resolve(
+  './app/videorender/requirements-whisper.txt'
+);
+const WHISPER_SETUP_HINT =
+  `Install local deps with Python 3.12 in the project root:\n` +
+  `python3.12 -m venv .venv-whisper\n` +
+  `.venv-whisper/bin/pip install -r ${WHISPER_REQUIREMENTS_PATH}\n` +
+  `Or set VIDERE_WHISPER_PYTHON to a Python interpreter that has torch + transformers.`;
+let isTranscriptionRunning = false;
+let cachedWhisperPython: string | null = null;
+
+type TranscriptMediaType =
+  | 'video'
+  | 'audio'
+  | 'image'
+  | 'text'
+  | 'groupped_scrubber';
+
+type WhisperClipJob = {
+  scrubberId: string;
+  inputPath: string;
+  startSec: number;
+  endSec: number;
+};
+
+type TranscribeClipWord = {
+  text: string;
+  start: number;
+  end: number;
+};
+
+type TranscribeClipResult = {
+  scrubberId: string;
+  text: string;
+  words: TranscribeClipWord[];
+  clipStartSec: number;
+  clipEndSec: number;
+  error: string | null;
+};
 
 function ensureMediaRootDir(): void {
   if (!fs.existsSync(OUT_DIR)) {
@@ -98,6 +143,241 @@ function toMediaUrl(storageKey: string): string {
     .map((segment) => encodeURIComponent(segment))
     .join('/');
   return `/media/${encodedKey}`;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function toNonNegativeInteger(value: unknown): number {
+  const parsed = toFiniteNumber(value);
+  if (parsed === null) return 0;
+  return Math.max(0, Math.floor(parsed));
+}
+
+function toMediaType(value: unknown): TranscriptMediaType | null {
+  const raw = toSingleString(value)?.trim();
+  if (
+    raw === 'video' ||
+    raw === 'audio' ||
+    raw === 'image' ||
+    raw === 'text' ||
+    raw === 'groupped_scrubber'
+  ) {
+    return raw;
+  }
+  return null;
+}
+
+function normalizeWords(value: unknown): TranscribeClipWord[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((word): TranscribeClipWord | null => {
+      if (!word || typeof word !== 'object') return null;
+      const node = word as Record<string, unknown>;
+      const text = toSingleString(node.text)?.trim();
+      const start = toFiniteNumber(node.start);
+      const end = toFiniteNumber(node.end);
+      if (!text || start === null || end === null) return null;
+      return { text, start, end };
+    })
+    .filter((word): word is TranscribeClipWord => Boolean(word));
+}
+
+function normalizeWhisperPythonCandidate(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  if (trimmed.includes(path.sep) || trimmed.startsWith('.')) {
+    return path.resolve(trimmed);
+  }
+  return trimmed;
+}
+
+function canProbeWhisperPython(pythonBin: string): { ok: boolean; reason?: string } {
+  const probe = spawnSync(
+    pythonBin,
+    ['-c', 'import torch, transformers'],
+    {
+      encoding: 'utf8',
+      timeout: 20_000,
+      env: process.env,
+    }
+  );
+
+  if (probe.error) {
+    return { ok: false, reason: probe.error.message };
+  }
+  if (probe.status !== 0) {
+    const stderr = (probe.stderr || '').trim();
+    const stdout = (probe.stdout || '').trim();
+    const detail = stderr || stdout || `exit code ${probe.status}`;
+    return { ok: false, reason: detail };
+  }
+  return { ok: true };
+}
+
+function resolveWhisperPython(): string {
+  const forcedPython = (process.env.VIDERE_WHISPER_PYTHON || '').trim();
+  if (forcedPython) {
+    const normalized = normalizeWhisperPythonCandidate(forcedPython);
+    const probe = canProbeWhisperPython(normalized);
+    if (probe.ok) {
+      cachedWhisperPython = normalized;
+      return normalized;
+    }
+    throw new Error(
+      `VIDERE_WHISPER_PYTHON is set to '${normalized}' but is not usable for Whisper: ${probe.reason}\n${WHISPER_SETUP_HINT}`
+    );
+  }
+
+  if (cachedWhisperPython) {
+    return cachedWhisperPython;
+  }
+
+  const candidates = [
+    '.venv-whisper/bin/python',
+    '.venv-whisper/bin/python3',
+    '.venv/bin/python',
+    '.venv/bin/python3',
+    'python3.12',
+    '/opt/homebrew/bin/python3.12',
+    'python3.11',
+    'python3',
+    'python',
+  ]
+    .map((candidate) => normalizeWhisperPythonCandidate(candidate))
+    .filter((candidate, index, all) => Boolean(candidate) && all.indexOf(candidate) === index);
+
+  const failures: string[] = [];
+  for (const candidate of candidates) {
+    const isPathLike =
+      candidate.includes(path.sep) || candidate.startsWith('.');
+    if (isPathLike && !fs.existsSync(candidate)) {
+      failures.push(`${candidate} (not found)`);
+      continue;
+    }
+
+    const probe = canProbeWhisperPython(candidate);
+    if (probe.ok) {
+      cachedWhisperPython = candidate;
+      return candidate;
+    }
+    failures.push(`${candidate} (${probe.reason || 'probe failed'})`);
+  }
+
+  throw new Error(
+    `No Python interpreter with torch + transformers was found. Tried: ${failures.join(
+      '; '
+    )}\n${WHISPER_SETUP_HINT}`
+  );
+}
+
+function runWhisperTranscription(
+  jobs: WhisperClipJob[],
+  model: string,
+  timestamps: string
+): Promise<TranscribeClipResult[]> {
+  return new Promise((resolve, reject) => {
+    if (!fs.existsSync(WHISPER_SCRIPT_PATH)) {
+      reject(
+        new Error(
+          `Whisper runner script not found at ${WHISPER_SCRIPT_PATH}.`
+        )
+      );
+      return;
+    }
+
+    const pythonBin = resolveWhisperPython();
+    const runner = spawn(pythonBin, [WHISPER_SCRIPT_PATH], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    runner.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf8');
+    });
+    runner.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+    });
+
+    runner.on('error', (error) => {
+      reject(
+        new Error(
+          `Failed to launch Whisper runner (${pythonBin}): ${error.message}`
+        )
+      );
+    });
+
+    runner.on('close', (code) => {
+      if (code !== 0) {
+        const detail = stderr.trim() || 'Unknown Python runner failure.';
+        reject(new Error(`Whisper runner exited with code ${code}: ${detail}`));
+        return;
+      }
+
+      try {
+        const rawStdout = (stdout || '').trim();
+        const jsonLine =
+          rawStdout
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .reverse()
+            .find((line) => line.startsWith('{') && line.endsWith('}')) ||
+          rawStdout ||
+          '{}';
+        const parsed = JSON.parse(jsonLine) as {
+          results?: Array<Record<string, unknown>>;
+        };
+        if (!Array.isArray(parsed.results)) {
+          reject(
+            new Error(
+              'Whisper runner returned an invalid payload (missing results array).'
+            )
+          );
+          return;
+        }
+
+        const normalized: TranscribeClipResult[] = parsed.results.map((entry) => {
+          const scrubberId = toSingleString(entry.scrubberId)?.trim() || 'unknown';
+          return {
+            scrubberId,
+            text: toSingleString(entry.text)?.trim() || '',
+            words: normalizeWords(entry.words),
+            clipStartSec: toFiniteNumber(entry.clipStartSec) ?? 0,
+            clipEndSec: toFiniteNumber(entry.clipEndSec) ?? 0,
+            error: toSingleString(entry.error),
+          };
+        });
+
+        resolve(normalized);
+      } catch (error) {
+        reject(
+          new Error(
+            `Failed to parse Whisper runner output: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          )
+        );
+      }
+    });
+
+    const payload = JSON.stringify({
+      model,
+      timestamps,
+      jobs,
+      ffmpegBin: process.env.VIDERE_WHISPER_FFMPEG_BIN || 'ffmpeg',
+      device: process.env.VIDERE_WHISPER_DEVICE || 'auto',
+    });
+    runner.stdin.write(payload);
+    runner.stdin.end();
+  });
 }
 
 // You only have to create a bundle once, and you may reuse it
@@ -346,6 +626,219 @@ app.delete('/media/:filename', (req: Request, res: Response): void => {
   }
 });
 
+app.post('/transcribe-clips', async (req: Request, res: Response): Promise<void> => {
+  if (isTranscriptionRunning) {
+    res.status(409).json({
+      error: 'A transcription request is already running. Please wait for it to complete.',
+    });
+    return;
+  }
+
+  isTranscriptionRunning = true;
+  try {
+    const body = req.body as Record<string, unknown> | undefined;
+    if (!body || typeof body !== 'object') {
+      res.status(400).json({ error: 'Invalid request body.' });
+      return;
+    }
+
+    const model = toSingleString(body.model)?.trim() || DEFAULT_WHISPER_MODEL;
+    const timestamps = toSingleString(body.timestamps)?.trim() || DEFAULT_WHISPER_TIMESTAMPS;
+    if (timestamps !== 'word') {
+      res.status(400).json({ error: "Only timestamps='word' is supported." });
+      return;
+    }
+
+    const rawClips = body.clips;
+    if (!Array.isArray(rawClips) || rawClips.length === 0) {
+      res.status(400).json({ error: 'At least one clip is required.' });
+      return;
+    }
+
+    const orderedResults: TranscribeClipResult[] = [];
+    const jobs: WhisperClipJob[] = [];
+    const jobResultIndices = new Map<string, number>();
+
+    for (const rawClip of rawClips) {
+      if (!rawClip || typeof rawClip !== 'object') {
+        orderedResults.push({
+          scrubberId: `unknown-${orderedResults.length + 1}`,
+          text: '',
+          words: [],
+          clipStartSec: 0,
+          clipEndSec: 0,
+          error: 'Clip item must be an object.',
+        });
+        continue;
+      }
+      const clip = rawClip as Record<string, unknown>;
+      const scrubberId = toSingleString(clip.scrubberId)?.trim() || `unknown-${orderedResults.length + 1}`;
+      const mediaType = toMediaType(clip.mediaType);
+      if (!mediaType) {
+        orderedResults.push({
+          scrubberId,
+          text: '',
+          words: [],
+          clipStartSec: 0,
+          clipEndSec: 0,
+          error: 'Missing or invalid mediaType.',
+        });
+        continue;
+      }
+
+      if (mediaType !== 'video' && mediaType !== 'audio') {
+        orderedResults.push({
+          scrubberId,
+          text: '',
+          words: [],
+          clipStartSec: 0,
+          clipEndSec: 0,
+          error: `Unsupported media type for transcription: ${mediaType}`,
+        });
+        continue;
+      }
+
+      const storageKey = toSingleString(clip.storageKey)?.trim();
+      if (!storageKey) {
+        orderedResults.push({
+          scrubberId,
+          text: '',
+          words: [],
+          clipStartSec: 0,
+          clipEndSec: 0,
+          error: 'Missing storageKey.',
+        });
+        continue;
+      }
+
+      const durationInSeconds = toFiniteNumber(clip.durationInSeconds);
+      if (durationInSeconds === null || durationInSeconds <= 0) {
+        orderedResults.push({
+          scrubberId,
+          text: '',
+          words: [],
+          clipStartSec: 0,
+          clipEndSec: 0,
+          error: 'Missing or invalid durationInSeconds.',
+        });
+        continue;
+      }
+
+      const trimBeforeFrames = toNonNegativeInteger(clip.trimBeforeFrames);
+      const trimAfterFrames = toNonNegativeInteger(clip.trimAfterFrames);
+      const clipStartSec = Math.max(0, trimBeforeFrames / FPS);
+      const clipEndSec = Math.max(
+        clipStartSec + 0.01,
+        durationInSeconds - trimAfterFrames / FPS
+      );
+
+      let inputPath: string;
+      try {
+        inputPath = resolveStoragePath(storageKey);
+      } catch (error) {
+        orderedResults.push({
+          scrubberId,
+          text: '',
+          words: [],
+          clipStartSec,
+          clipEndSec,
+          error:
+            error instanceof Error
+              ? `Invalid storage key: ${error.message}`
+              : 'Invalid storage key.',
+        });
+        continue;
+      }
+      if (!fs.existsSync(inputPath)) {
+        orderedResults.push({
+          scrubberId,
+          text: '',
+          words: [],
+          clipStartSec,
+          clipEndSec,
+          error: `Media file not found for storage key: ${storageKey}`,
+        });
+        continue;
+      }
+
+      orderedResults.push({
+        scrubberId,
+        text: '',
+        words: [],
+        clipStartSec,
+        clipEndSec,
+        error: null,
+      });
+      jobResultIndices.set(scrubberId, orderedResults.length - 1);
+      jobs.push({
+        scrubberId,
+        inputPath,
+        startSec: clipStartSec,
+        endSec: clipEndSec,
+      });
+    }
+
+    if (jobs.length > 0) {
+      let whisperResults: TranscribeClipResult[] = [];
+      let runnerError: string | null = null;
+      try {
+        whisperResults = await runWhisperTranscription(jobs, model, timestamps);
+      } catch (error) {
+        runnerError =
+          error instanceof Error
+            ? error.message
+            : 'Unknown error while running transcription.';
+      }
+
+      const resultById = new Map(
+        whisperResults.map((result) => [result.scrubberId, result])
+      );
+      for (const job of jobs) {
+        const resultIndex = jobResultIndices.get(job.scrubberId);
+        if (typeof resultIndex !== 'number') continue;
+        const existing = orderedResults[resultIndex];
+        const fromRunner = resultById.get(job.scrubberId);
+        if (fromRunner) {
+          orderedResults[resultIndex] = {
+            scrubberId: job.scrubberId,
+            text: fromRunner.text || '',
+            words: fromRunner.words || [],
+            clipStartSec: Number.isFinite(fromRunner.clipStartSec)
+              ? fromRunner.clipStartSec
+              : existing.clipStartSec,
+            clipEndSec: Number.isFinite(fromRunner.clipEndSec)
+              ? fromRunner.clipEndSec
+              : existing.clipEndSec,
+            error: fromRunner.error || null,
+          };
+          continue;
+        }
+
+        orderedResults[resultIndex] = {
+          ...existing,
+          error: runnerError || 'No transcription result was returned for this clip.',
+        };
+      }
+    }
+
+    res.json({
+      model,
+      timestamps,
+      results: orderedResults,
+    });
+  } catch (error) {
+    console.error('Transcribe clips error:', error);
+    res.status(500).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to transcribe clips.',
+    });
+  } finally {
+    isTranscriptionRunning = false;
+  }
+});
+
 // Health check endpoint to monitor system resources
 app.get('/health', (req, res) => {
   const used = process.memoryUsage();
@@ -448,6 +941,7 @@ app.listen(port, () => {
   console.log(`📤 Upload multiple: POST http://localhost:${port}/upload-multiple`);
   console.log(`📋 Clone media: POST http://localhost:${port}/clone-media`);
   console.log(`🗑️ Delete file: DELETE http://localhost:${port}/media/:filename`);
+  console.log(`📝 Transcribe clips: POST http://localhost:${port}/transcribe-clips`);
   console.log(`🖥️ Optimized for 4vCPU, 8GB RAM server:`);
   console.log(`   - Multi-threaded processing (3 cores)`);
   console.log(`   - Balanced quality/speed encoding`);
