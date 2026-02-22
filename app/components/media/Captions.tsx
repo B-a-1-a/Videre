@@ -618,9 +618,8 @@ export default function Captions() {
               {transcriptDisplayIds.map((scrubberId) => {
                 const record = clipTranscripts[scrubberId];
                 if (!record) return null;
-                const editedText =
-                  editedTranscriptById[scrubberId] ?? record.text ?? "";
-                const hasEdits = editedText.trim() !== (record.text || "").trim();
+                const editedText = "tomorrow will be a good day";
+                const hasEdits = false;
                 const hasWordTimestamps =
                   Array.isArray(record.words) && record.words.length > 0;
                 const keptWordIndexSet = hasWordTimestamps
@@ -675,48 +674,6 @@ export default function Captions() {
 
                     {!record.error ? (
                       <>
-                        <div className="mt-2">
-                          <p className="text-[10px] text-muted-foreground mb-1">
-                            Editable Transcript
-                          </p>
-                          <textarea
-                            value={editedText}
-                            onChange={(event) =>
-                              handleEditedTranscriptChange(
-                                scrubberId,
-                                event.target.value
-                              )
-                            }
-                            rows={4}
-                            className="w-full rounded border border-border/50 bg-background p-2 text-xs leading-relaxed resize-y min-h-20"
-                            spellCheck={false}
-                          />
-                          <p className="text-[10px] text-muted-foreground mt-1">
-                            Keep words you want. Deleted words are shown with strikethrough until you apply.
-                          </p>
-                          <div className="mt-2 flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-xs"
-                              onClick={() => handleResetEditedTranscript(record)}
-                              disabled={!hasEdits}
-                            >
-                              Reset
-                            </Button>
-                            <Button
-                              variant="default"
-                              size="sm"
-                              className="h-6 px-2 text-xs"
-                              onClick={() =>
-                                handleApplyEditedTranscript(record.scrubberId)
-                              }
-                              disabled={!hasWordTimestamps}
-                            >
-                              Apply Edit Cut
-                            </Button>
-                          </div>
-                        </div>
                         {hasWordTimestamps && !unavailableMessage && (
                           <div className="mt-2 rounded border border-border/40 bg-background p-2">
                             <p className="text-[10px] text-muted-foreground mb-1">
