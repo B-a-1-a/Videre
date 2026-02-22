@@ -20,8 +20,12 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::project::project_create,
             commands::project::project_open,
+            commands::project::project_open_by_id,
             commands::project::project_save,
+            commands::project::project_save_state,
             commands::project::project_list_recent,
+            commands::project::project_rename,
+            commands::project::project_storage_stats,
             commands::project::project_delete,
             commands::media::media_import,
             commands::media::media_remove,
@@ -32,6 +36,7 @@ pub fn run() {
             commands::render::render_start,
             commands::render::render_status,
             commands::render::render_cancel,
+            commands::render::render_capabilities,
             commands::analysis_stub::analysis_enqueue_stub,
         ])
         .run(tauri::generate_context!())

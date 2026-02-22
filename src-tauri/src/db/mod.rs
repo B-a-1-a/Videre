@@ -9,7 +9,8 @@ use rusqlite::{params, Connection};
 use crate::{
     error::{AppResult, ErrorEnvelope},
     model::{
-        AssetKind, Clip, MediaAsset, ProjectSnapshot, ProjectSummary, TimelineDto, Track, TrackKind,
+        AssetKind, Clip, MediaAsset, ProjectSnapshot, ProjectSummary, TextOverlay, TimelineDto,
+        Track, TrackKind, Transition,
     },
 };
 
@@ -63,6 +64,48 @@ pub fn run_migrations(conn: &Connection) -> AppResult<()> {
         conn.execute(
             "INSERT INTO schema_migrations (version, applied_at) VALUES (?1, ?2)",
             params![2_i64, now_iso()],
+        )?;
+    }
+
+    // Migration 3: text overlays table
+    let v3_applied: i64 = conn.query_row(
+        "SELECT COUNT(1) FROM schema_migrations WHERE version = ?1",
+        params![3_i64],
+        |row| row.get(0),
+    )?;
+    if v3_applied == 0 {
+        conn.execute_batch(include_str!("migrations/0003_text_overlays.sql"))?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (?1, ?2)",
+            params![3_i64, now_iso()],
+        )?;
+    }
+
+    // Migration 4: transitions table
+    let v4_applied: i64 = conn.query_row(
+        "SELECT COUNT(1) FROM schema_migrations WHERE version = ?1",
+        params![4_i64],
+        |row| row.get(0),
+    )?;
+    if v4_applied == 0 {
+        conn.execute_batch(include_str!("migrations/0004_transitions.sql"))?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (?1, ?2)",
+            params![4_i64, now_iso()],
+        )?;
+    }
+
+    // Migration 5: canonical project state column
+    let v5_applied: i64 = conn.query_row(
+        "SELECT COUNT(1) FROM schema_migrations WHERE version = ?1",
+        params![5_i64],
+        |row| row.get(0),
+    )?;
+    if v5_applied == 0 {
+        conn.execute_batch(include_str!("migrations/0005_project_state.sql"))?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (?1, ?2)",
+            params![5_i64, now_iso()],
         )?;
     }
 
@@ -226,6 +269,64 @@ pub fn get_clips(conn: &Connection, project_id: &str) -> AppResult<Vec<Clip>> {
     Ok(clips)
 }
 
+pub fn get_text_overlays(conn: &Connection, project_id: &str) -> AppResult<Vec<TextOverlay>> {
+    let mut stmt = conn.prepare(
+        "SELECT t.id, t.clip_id, t.content, t.font_family, t.font_size, t.font_weight,
+                t.font_color, t.background_color, t.text_align, t.position_x, t.position_y
+         FROM text_overlays t
+         JOIN clips c ON c.id = t.clip_id
+         WHERE c.project_id = ?1",
+    )?;
+
+    let rows = stmt.query_map(params![project_id], |row| {
+        Ok(TextOverlay {
+            id: row.get(0)?,
+            clip_id: row.get(1)?,
+            content: row.get(2)?,
+            font_family: row.get(3)?,
+            font_size: row.get(4)?,
+            font_weight: row.get(5)?,
+            font_color: row.get(6)?,
+            background_color: row.get(7)?,
+            text_align: row.get(8)?,
+            position_x: row.get(9)?,
+            position_y: row.get(10)?,
+        })
+    })?;
+
+    let mut overlays = Vec::new();
+    for row in rows {
+        overlays.push(row?);
+    }
+    Ok(overlays)
+}
+
+pub fn get_transitions(conn: &Connection, project_id: &str) -> AppResult<Vec<Transition>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, project_id, track_id, from_clip_id, to_clip_id, transition_type, duration_ms
+         FROM transitions
+         WHERE project_id = ?1",
+    )?;
+
+    let rows = stmt.query_map(params![project_id], |row| {
+        Ok(Transition {
+            id: row.get(0)?,
+            project_id: row.get(1)?,
+            track_id: row.get(2)?,
+            from_clip_id: row.get(3)?,
+            to_clip_id: row.get(4)?,
+            transition_type: row.get(5)?,
+            duration_ms: row.get(6)?,
+        })
+    })?;
+
+    let mut transitions = Vec::new();
+    for row in rows {
+        transitions.push(row?);
+    }
+    Ok(transitions)
+}
+
 pub fn get_project_fps(conn: &Connection, project_id: &str) -> AppResult<i64> {
     let fps = conn.query_row(
         "SELECT fps FROM projects WHERE id = ?1",
@@ -238,6 +339,8 @@ pub fn get_project_fps(conn: &Connection, project_id: &str) -> AppResult<i64> {
 pub fn get_timeline(conn: &Connection, project_id: &str) -> AppResult<TimelineDto> {
     let tracks = get_tracks(conn, project_id)?;
     let clips = get_clips(conn, project_id)?;
+    let text_overlays = get_text_overlays(conn, project_id)?;
+    let transitions = get_transitions(conn, project_id)?;
     let fps = get_project_fps(conn, project_id)?;
 
     let mut duration_ms = 0_i64;
@@ -252,6 +355,8 @@ pub fn get_timeline(conn: &Connection, project_id: &str) -> AppResult<TimelineDt
         duration_ms,
         tracks,
         clips,
+        text_overlays,
+        transitions,
     })
 }
 

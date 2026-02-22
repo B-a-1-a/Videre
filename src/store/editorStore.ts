@@ -23,7 +23,9 @@ import {
   renderStatus,
   timelineApplyPatch,
   timelineGet,
+  timelineSaveJson,
 } from "../lib/ipc";
+import { undoManager } from "./undoManager";
 
 type EditorState = {
   currentProject?: ProjectSummary;
@@ -32,6 +34,7 @@ type EditorState = {
   timeline?: TimelineDto;
   selectedTrackId?: string;
   selectedClipId?: string;
+  selectedClipIds: string[];
   playheadMs: number;
   zoomPxPerSec: number;
   renderJob?: RenderJobDto;
@@ -54,7 +57,11 @@ type EditorState = {
   setPlayheadMs: (playheadMs: number) => void;
   setZoomPxPerSec: (zoomPxPerSec: number) => void;
   setSelectedClip: (clipId?: string) => void;
+  toggleClipSelection: (clipId: string, additive: boolean) => void;
   setSelectedTrack: (trackId?: string) => void;
+  groupSelectedClips: () => Promise<void>;
+  ungroupClip: (clipId: string) => Promise<void>;
+  deleteSelectedClips: () => Promise<void>;
   updateImportProgress: (assetId: string, progress: number) => void;
   clearError: () => void;
   closeProject: () => void;
@@ -66,6 +73,14 @@ type EditorState = {
   startRender: (settings: RenderSettingsDto) => Promise<void>;
   pollRenderStatus: () => Promise<void>;
   cancelRender: () => Promise<void>;
+  addTextClip: (trackId: string, timelineStartMs: number, content: string) => Promise<void>;
+  updateTextOverlay: (clipId: string, updates: Record<string, unknown>) => Promise<void>;
+  addTransition: (trackId: string, fromClipId: string, toClipId: string, transitionType: string, durationMs: number) => Promise<void>;
+  deleteTransition: (transitionId: string) => Promise<void>;
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => Promise<void>;
+  redo: () => Promise<void>;
 };
 
 function normalizeError(error: unknown): string {
@@ -92,14 +107,47 @@ function upsertAssets(current: MediaAsset[], incoming: MediaAsset[]): MediaAsset
   return [...map.values()];
 }
 
+function reconcileTimelineSelection(
+  timeline: TimelineDto,
+  selectedTrackId?: string,
+  selectedClipId?: string,
+): { selectedTrackId?: string; selectedClipId?: string } {
+  const nextSelectedClipId = selectedClipId && timeline.clips.some((clip) => clip.id === selectedClipId)
+    ? selectedClipId
+    : undefined;
+
+  let nextSelectedTrackId = selectedTrackId && timeline.tracks.some((track) => track.id === selectedTrackId)
+    ? selectedTrackId
+    : undefined;
+
+  if (!nextSelectedTrackId && nextSelectedClipId) {
+    const selectedClip = timeline.clips.find((clip) => clip.id === nextSelectedClipId);
+    if (selectedClip && timeline.tracks.some((track) => track.id === selectedClip.trackId)) {
+      nextSelectedTrackId = selectedClip.trackId;
+    }
+  }
+
+  if (!nextSelectedTrackId) {
+    nextSelectedTrackId = timeline.tracks[0]?.id;
+  }
+
+  return {
+    selectedTrackId: nextSelectedTrackId,
+    selectedClipId: nextSelectedClipId,
+  };
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   recentProjects: [],
   assets: [],
+  selectedClipIds: [],
   playheadMs: 0,
   zoomPxPerSec: 100,
   loading: false,
   importProgressByAssetId: {},
   isPlaying: false,
+  canUndo: false,
+  canRedo: false,
 
   loadRecentProjects: async () => {
     try {
@@ -210,7 +258,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     try {
       const timeline = await timelineGet(currentProject.id);
-      set({ timeline });
+      const selection = reconcileTimelineSelection(
+        timeline,
+        get().selectedTrackId,
+        get().selectedClipId,
+      );
+      set({ timeline, ...selection });
     } catch (error) {
       set({ errorMessage: normalizeError(error) });
     }
@@ -220,9 +273,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const currentProject = get().currentProject;
     if (!currentProject || operations.length === 0) return;
 
+    // Snapshot current timeline for undo before applying
+    const prevTimeline = get().timeline;
+    if (prevTimeline) {
+      undoManager.push(prevTimeline);
+    }
+
     try {
       const timeline = await timelineApplyPatch(currentProject.id, { operations });
-      set({ timeline, errorMessage: undefined });
+      const selection = reconcileTimelineSelection(
+        timeline,
+        get().selectedTrackId,
+        get().selectedClipId,
+      );
+      const validIds = new Set(timeline.clips.map((c) => c.id));
+      const nextSelectedClipIds = get().selectedClipIds.filter((id) => validIds.has(id));
+      set({ timeline, ...selection, selectedClipIds: nextSelectedClipIds, errorMessage: undefined, canUndo: undoManager.canUndo, canRedo: undoManager.canRedo });
     } catch (error) {
       set({ errorMessage: normalizeError(error) });
     }
@@ -245,8 +311,48 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setPlayheadMs: (playheadMs) => set({ playheadMs }),
   setZoomPxPerSec: (zoomPxPerSec) => set({ zoomPxPerSec }),
-  setSelectedClip: (selectedClipId) => set({ selectedClipId }),
+  setSelectedClip: (selectedClipId) => set({ selectedClipId, selectedClipIds: selectedClipId ? [selectedClipId] : [] }),
+  toggleClipSelection: (clipId: string, additive: boolean) => {
+    const current = get().selectedClipIds;
+    if (additive) {
+      const next = current.includes(clipId)
+        ? current.filter((id) => id !== clipId)
+        : [...current, clipId];
+      set({ selectedClipIds: next, selectedClipId: next[next.length - 1] });
+    } else {
+      set({ selectedClipIds: [clipId], selectedClipId: clipId });
+    }
+  },
   setSelectedTrack: (selectedTrackId) => set({ selectedTrackId }),
+
+  groupSelectedClips: async () => {
+    const { selectedClipIds } = get();
+    if (selectedClipIds.length < 2) return;
+    const groupId = crypto.randomUUID();
+    const ops: TimelineOperation[] = selectedClipIds.map((clipId) => ({
+      type: "set_linked_group" as const,
+      clipId,
+      linkedGroupId: groupId,
+    }));
+    await get().applyTimelinePatch(ops);
+  },
+
+  ungroupClip: async (clipId: string) => {
+    await get().applyTimelinePatch([
+      { type: "set_linked_group", clipId, linkedGroupId: undefined },
+    ]);
+  },
+
+  deleteSelectedClips: async () => {
+    const { selectedClipIds } = get();
+    if (selectedClipIds.length === 0) return;
+    const ops: TimelineOperation[] = selectedClipIds.map((clipId) => ({
+      type: "delete_clip" as const,
+      clipId,
+    }));
+    await get().applyTimelinePatch(ops);
+    set({ selectedClipIds: [], selectedClipId: undefined });
+  },
   updateImportProgress: (assetId, progress) => {
     set((state) => ({
       importProgressByAssetId: {
@@ -259,18 +365,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   clearError: () => set({ errorMessage: undefined }),
 
   closeProject: () => {
+    undoManager.clear();
     useEditorStore.setState({
       currentProject: undefined,
       assets: [],
       timeline: undefined,
       selectedTrackId: undefined,
       selectedClipId: undefined,
+      selectedClipIds: [],
       playheadMs: 0,
       renderJob: undefined,
       importProgressByAssetId: {},
       isPlaying: false,
       errorMessage: undefined,
       statusMessage: undefined,
+      canUndo: false,
+      canRedo: false,
     });
   },
 
@@ -298,8 +408,51 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
+  addTextClip: async (trackId: string, timelineStartMs: number, content: string) => {
+    await get().applyTimelinePatch([
+      {
+        type: "add_text_clip",
+        trackId,
+        timelineStartMs,
+        durationMs: 3000,
+        content,
+      },
+    ]);
+  },
+
+  updateTextOverlay: async (clipId: string, updates: Record<string, unknown>) => {
+    await get().applyTimelinePatch([
+      {
+        type: "update_text_overlay",
+        clipId,
+        ...updates,
+      } as TimelineOperation,
+    ]);
+  },
+
+  addTransition: async (trackId: string, fromClipId: string, toClipId: string, transitionType: string, durationMs: number) => {
+    await get().applyTimelinePatch([
+      {
+        type: "add_transition",
+        trackId,
+        fromClipId,
+        toClipId,
+        transitionType,
+        durationMs,
+      },
+    ]);
+  },
+
+  deleteTransition: async (transitionId: string) => {
+    await get().applyTimelinePatch([
+      { type: "delete_transition", transitionId },
+    ]);
+  },
+
   addTrack: async (kind: TrackKind) => {
-    const name = kind === "audio" ? "Audio" : "Video";
+    const timeline = get().timeline;
+    const trackCountOfKind = timeline?.tracks.filter((track) => track.kind === kind).length ?? 0;
+    const name = `${kind === "audio" ? "Audio" : "Video"} ${trackCountOfKind + 1}`;
     await get().applyTimelinePatch([{ type: "add_track", kind, name }]);
   },
 
@@ -348,6 +501,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ errorMessage: normalizeError(error) });
     }
   },
+
+  undo: async () => {
+    const currentProject = get().currentProject;
+    if (!currentProject) return;
+
+    const snapshot = undoManager.undo();
+    if (!snapshot) return;
+
+    try {
+      await timelineSaveJson(currentProject.id, JSON.stringify(snapshot));
+      await get().refreshTimeline();
+      set({ canUndo: undoManager.canUndo, canRedo: undoManager.canRedo });
+    } catch (error) {
+      set({ errorMessage: normalizeError(error) });
+    }
+  },
+
+  redo: async () => {
+    const currentProject = get().currentProject;
+    if (!currentProject) return;
+
+    const snapshot = undoManager.redo();
+    if (!snapshot) return;
+
+    try {
+      await timelineSaveJson(currentProject.id, JSON.stringify(snapshot));
+      await get().refreshTimeline();
+      set({ canUndo: undoManager.canUndo, canRedo: undoManager.canRedo });
+    } catch (error) {
+      set({ errorMessage: normalizeError(error) });
+    }
+  },
 }));
 
 function setSnapshot(snapshot: ProjectSnapshot) {
@@ -357,6 +542,7 @@ function setSnapshot(snapshot: ProjectSnapshot) {
     timeline: snapshot.timeline,
     selectedTrackId: snapshot.timeline.tracks[0]?.id,
     selectedClipId: undefined,
+    selectedClipIds: [],
     playheadMs: 0,
     errorMessage: undefined,
     renderJob: undefined,

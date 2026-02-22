@@ -27,6 +27,16 @@ export function useKeyboardShortcuts() {
           }
           break;
 
+        case "KeyZ":
+          if (isMeta && e.shiftKey) {
+            e.preventDefault();
+            void state.redo();
+          } else if (isMeta) {
+            e.preventDefault();
+            void state.undo();
+          }
+          break;
+
         case "KeyS":
           if (isMeta) {
             e.preventDefault();

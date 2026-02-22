@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AnalysisJobDto,
   ImportBatchResult,
+  MediaAsset,
   OpResult,
   ProjectSnapshot,
   ProjectSummary,
@@ -30,12 +31,38 @@ export type RenderProgressEvent = {
   error?: string;
 };
 
+export type ProjectStateDto = {
+  timeline: unknown;
+  textBinItems: unknown;
+};
+
+export type ProjectStateSnapshot = {
+  summary: ProjectSummary;
+  assets: MediaAsset[];
+  timeline: unknown;
+  textBinItems: unknown;
+};
+
+export type StorageStatsDto = {
+  usedBytes: number;
+  limitBytes: number;
+};
+
+export type RenderCapabilitiesDto = {
+  remotionEnabled: boolean;
+  reason?: string;
+};
+
 export async function projectCreate(name: string, location: string): Promise<ProjectSummary> {
   return invoke<ProjectSummary>("project_create", { name, location });
 }
 
 export async function projectOpen(projectRoot: string): Promise<ProjectSnapshot> {
   return invoke<ProjectSnapshot>("project_open", { projectRoot });
+}
+
+export async function projectOpenById(projectId: string): Promise<ProjectStateSnapshot> {
+  return invoke<ProjectStateSnapshot>("project_open_by_id", { projectId });
 }
 
 export async function projectSave(projectId: string): Promise<SaveResult> {
@@ -48,6 +75,18 @@ export async function projectListRecent(): Promise<ProjectSummary[]> {
 
 export async function projectDelete(projectId: string): Promise<OpResult> {
   return invoke<OpResult>("project_delete", { projectId });
+}
+
+export async function projectRename(projectId: string, name: string): Promise<ProjectSummary> {
+  return invoke<ProjectSummary>("project_rename", { projectId, name });
+}
+
+export async function projectSaveState(projectId: string, projectState: ProjectStateDto): Promise<SaveResult> {
+  return invoke<SaveResult>("project_save_state", { projectId, projectState });
+}
+
+export async function projectStorageStats(projectId: string): Promise<StorageStatsDto> {
+  return invoke<StorageStatsDto>("project_storage_stats", { projectId });
 }
 
 export async function mediaImport(projectId: string, sourcePaths: string[]): Promise<ImportBatchResult> {
@@ -87,6 +126,10 @@ export async function renderStatus(projectId: string, jobId: string): Promise<Re
 
 export async function renderCancel(projectId: string, jobId: string): Promise<OpResult> {
   return invoke<OpResult>("render_cancel", { projectId, jobId });
+}
+
+export async function renderCapabilities(): Promise<RenderCapabilitiesDto> {
+  return invoke<RenderCapabilitiesDto>("render_capabilities");
 }
 
 export async function analysisEnqueueStub(projectId: string, jobKind: string): Promise<AnalysisJobDto> {
@@ -168,6 +211,59 @@ function toRustTimelinePatch(patch: TimelinePatchDto): unknown {
           };
         case "delete_clip":
           return { type: operation.type, clip_id: operation.clipId };
+        case "add_text_clip":
+          return {
+            type: operation.type,
+            track_id: operation.trackId,
+            timeline_start_ms: operation.timelineStartMs,
+            duration_ms: operation.durationMs,
+            content: operation.content,
+            font_family: operation.fontFamily,
+            font_size: operation.fontSize,
+            font_color: operation.fontColor,
+            font_weight: operation.fontWeight,
+            text_align: operation.textAlign,
+            position_x: operation.positionX,
+            position_y: operation.positionY,
+          };
+        case "update_text_overlay":
+          return {
+            type: operation.type,
+            clip_id: operation.clipId,
+            content: operation.content,
+            font_family: operation.fontFamily,
+            font_size: operation.fontSize,
+            font_color: operation.fontColor,
+            font_weight: operation.fontWeight,
+            text_align: operation.textAlign,
+            background_color: operation.backgroundColor,
+            position_x: operation.positionX,
+            position_y: operation.positionY,
+          };
+        case "add_transition":
+          return {
+            type: operation.type,
+            track_id: operation.trackId,
+            from_clip_id: operation.fromClipId,
+            to_clip_id: operation.toClipId,
+            transition_type: operation.transitionType,
+            duration_ms: operation.durationMs,
+          };
+        case "update_transition":
+          return {
+            type: operation.type,
+            transition_id: operation.transitionId,
+            transition_type: operation.transitionType,
+            duration_ms: operation.durationMs,
+          };
+        case "delete_transition":
+          return { type: operation.type, transition_id: operation.transitionId };
+        case "set_linked_group":
+          return {
+            type: operation.type,
+            clip_id: operation.clipId,
+            linked_group_id: operation.linkedGroupId,
+          };
         default:
           return operation;
       }

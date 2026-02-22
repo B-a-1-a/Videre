@@ -1,12 +1,52 @@
+use std::{path::PathBuf, process::Command};
+
 use rusqlite::params;
 
 use crate::{
     db::{now_iso, open_connection, project_db_path},
     error::{AppResult, ErrorEnvelope},
-    model::{JobStatus, OpResult, RenderJobDto, RenderSettingsDto},
+    model::{JobStatus, OpResult, RenderCapabilitiesDto, RenderJobDto, RenderSettingsDto},
     services::render_pipeline,
     state::AppState,
 };
+
+#[tauri::command]
+pub fn render_capabilities() -> AppResult<RenderCapabilitiesDto> {
+    if !cfg!(debug_assertions) {
+        return Ok(RenderCapabilitiesDto {
+            remotion_enabled: false,
+            reason: Some("Remotion export is enabled only in dev builds.".to_string()),
+        });
+    }
+
+    let node_ok = Command::new("node")
+        .arg("--version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false);
+    if !node_ok {
+        return Ok(RenderCapabilitiesDto {
+            remotion_enabled: false,
+            reason: Some("Node.js is required for Remotion export in dev mode.".to_string()),
+        });
+    }
+
+    let script_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("scripts")
+        .join("remotion-render.mjs");
+    if !script_path.exists() {
+        return Ok(RenderCapabilitiesDto {
+            remotion_enabled: false,
+            reason: Some("Missing scripts/remotion-render.mjs.".to_string()),
+        });
+    }
+
+    Ok(RenderCapabilitiesDto {
+        remotion_enabled: true,
+        reason: None,
+    })
+}
 
 #[tauri::command]
 pub fn render_start(
@@ -15,6 +55,15 @@ pub fn render_start(
     project_id: String,
     settings: RenderSettingsDto,
 ) -> AppResult<RenderJobDto> {
+    let capabilities = render_capabilities()?;
+    if !capabilities.remotion_enabled {
+        return Err(ErrorEnvelope::invalid_input(
+            capabilities
+                .reason
+                .unwrap_or_else(|| "Render is not available in this environment.".to_string()),
+        ));
+    }
+
     let project_root = super::project::resolve_project_root(&app, &state, &project_id)?;
     let db_path = project_db_path(&project_root);
     let conn = open_connection(&db_path)?;

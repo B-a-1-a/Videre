@@ -2,15 +2,19 @@ use std::{fs, path::PathBuf};
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use tauri::Manager;
 
 use crate::{
     db::{
-        ensure_project_layout, get_project_summary, open_connection, project_db_path,
-        run_migrations, touch_project,
+        ensure_project_layout, get_assets, get_project_summary, now_iso, open_connection,
+        project_db_path, run_migrations, touch_project,
     },
     error::{AppResult, ErrorEnvelope},
-    model::{OpResult, ProjectSnapshot, ProjectSummary, SaveResult},
+    model::{
+        OpResult, ProjectSnapshot, ProjectStateDto, ProjectStateSnapshot, ProjectSummary,
+        SaveResult, StorageStatsDto,
+    },
     state::AppState,
 };
 
@@ -92,6 +96,32 @@ pub fn project_open(
 }
 
 #[tauri::command]
+pub fn project_open_by_id(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    project_id: String,
+) -> AppResult<ProjectStateSnapshot> {
+    let root = resolve_project_root(&app, &state, &project_id)?;
+    let db_path = project_db_path(&root);
+    let conn = open_connection(&db_path)?;
+    run_migrations(&conn)?;
+
+    let summary = get_project_summary(&conn)?;
+    let assets = get_assets(&conn, &summary.id)?;
+    let (timeline, text_bin_items) = load_project_state_json(&conn, &summary.id)?;
+
+    state.set_project_root(summary.id.clone(), root);
+    persist_recent_project(&app, &summary)?;
+
+    Ok(ProjectStateSnapshot {
+        summary,
+        assets,
+        timeline,
+        text_bin_items,
+    })
+}
+
+#[tauri::command]
 pub fn project_save(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
@@ -115,6 +145,103 @@ pub fn project_save(
 #[tauri::command]
 pub fn project_list_recent(app: tauri::AppHandle) -> AppResult<Vec<ProjectSummary>> {
     Ok(read_recent_projects(&app)?.projects)
+}
+
+#[tauri::command]
+pub fn project_rename(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    project_id: String,
+    name: String,
+) -> AppResult<ProjectSummary> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(ErrorEnvelope::invalid_input("Project name is required"));
+    }
+
+    let root = resolve_project_root(&app, &state, &project_id)?;
+    let db_path = project_db_path(&root);
+    let conn = open_connection(&db_path)?;
+    run_migrations(&conn)?;
+
+    let changed = conn.execute(
+        "UPDATE projects SET name = ?1, updated_at = ?2 WHERE id = ?3",
+        params![trimmed, now_iso(), &project_id],
+    )?;
+    if changed == 0 {
+        return Err(ErrorEnvelope::not_found("Project not found"));
+    }
+
+    let summary = get_project_summary(&conn)?;
+    persist_recent_project(&app, &summary)?;
+    Ok(summary)
+}
+
+#[tauri::command]
+pub fn project_save_state(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    project_id: String,
+    project_state: ProjectStateDto,
+) -> AppResult<SaveResult> {
+    let root = resolve_project_root(&app, &state, &project_id)?;
+    let db_path = project_db_path(&root);
+    let conn = open_connection(&db_path)?;
+    run_migrations(&conn)?;
+
+    conn.execute(
+        "UPDATE projects
+         SET timeline_json = ?1,
+             text_bin_items_json = ?2,
+             updated_at = ?3
+         WHERE id = ?4",
+        params![
+            serde_json::to_string(&project_state.timeline)?,
+            serde_json::to_string(&project_state.text_bin_items)?,
+            now_iso(),
+            &project_id
+        ],
+    )?;
+
+    touch_project(&conn, &project_id)?;
+    let summary = get_project_summary(&conn)?;
+    persist_recent_project(&app, &summary)?;
+
+    Ok(SaveResult {
+        project_id,
+        saved_at: summary.updated_at,
+        status: "ok".to_string(),
+    })
+}
+
+#[tauri::command]
+pub fn project_storage_stats(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    project_id: String,
+) -> AppResult<StorageStatsDto> {
+    let root = resolve_project_root(&app, &state, &project_id)?;
+    let db_path = project_db_path(&root);
+    let conn = open_connection(&db_path)?;
+    run_migrations(&conn)?;
+
+    let assets = get_assets(&conn, &project_id)?;
+    let mut used_bytes = 0_i64;
+
+    for asset in &assets {
+        used_bytes += file_len(&asset.managed_path);
+        if let Some(proxy_path) = &asset.proxy_path {
+            used_bytes += file_len(proxy_path);
+        }
+        if let Some(waveform_path) = &asset.waveform_path {
+            used_bytes += file_len(waveform_path);
+        }
+    }
+
+    Ok(StorageStatsDto {
+        used_bytes,
+        limit_bytes: 2 * 1024 * 1024 * 1024,
+    })
 }
 
 #[tauri::command]
@@ -259,4 +386,44 @@ fn slugify(name: &str) -> String {
     } else {
         cleaned
     }
+}
+
+fn file_len(path: &str) -> i64 {
+    fs::metadata(path)
+        .ok()
+        .map(|meta| meta.len() as i64)
+        .unwrap_or(0)
+}
+
+fn load_project_state_json(
+    conn: &rusqlite::Connection,
+    project_id: &str,
+) -> AppResult<(serde_json::Value, serde_json::Value)> {
+    let (timeline_json, text_bin_items_json): (Option<String>, Option<String>) = conn.query_row(
+        "SELECT timeline_json, text_bin_items_json FROM projects WHERE id = ?1",
+        params![project_id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+
+    let timeline = timeline_json
+        .as_deref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .unwrap_or_else(default_timeline_state);
+    let text_bin_items = text_bin_items_json
+        .as_deref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .unwrap_or_else(|| json!([]));
+
+    Ok((timeline, text_bin_items))
+}
+
+fn default_timeline_state() -> serde_json::Value {
+    json!({
+        "tracks": [
+            { "id": "track-1", "scrubbers": [], "transitions": [] },
+            { "id": "track-2", "scrubbers": [], "transitions": [] },
+            { "id": "track-3", "scrubbers": [], "transitions": [] },
+            { "id": "track-4", "scrubbers": [], "transitions": [] }
+        ]
+    })
 }

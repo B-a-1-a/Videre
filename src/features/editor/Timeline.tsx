@@ -3,8 +3,8 @@ import { useEditorStore } from "../../store/editorStore";
 import { TimelineRuler } from "./TimelineRuler";
 import { TimelineTrack } from "./TimelineTrack";
 import { Playhead } from "./Playhead";
-import { TRACK_HEADER_WIDTH_PX, RULER_HEIGHT_PX } from "./constants";
-import { msToPx, pxToMs, snapMs } from "./utils";
+import { TRACK_HEADER_WIDTH_PX, RULER_HEIGHT_PX, MIN_ZOOM_PX_PER_SEC, MAX_ZOOM_PX_PER_SEC } from "./constants";
+import { clamp, msToClockTimecode, msToPx, parseTimecodeToMs, pxToMs, snapMs } from "./utils";
 import type { Clip } from "../../types/domain";
 
 export function Timeline() {
@@ -14,15 +14,23 @@ export function Timeline() {
   const playheadMs = useEditorStore((s) => s.playheadMs);
   const selectedTrackId = useEditorStore((s) => s.selectedTrackId);
   const selectedClipId = useEditorStore((s) => s.selectedClipId);
+  const selectedClipIds = useEditorStore((s) => s.selectedClipIds);
   const setPlayheadMs = useEditorStore((s) => s.setPlayheadMs);
   const setSelectedTrack = useEditorStore((s) => s.setSelectedTrack);
-  const setSelectedClip = useEditorStore((s) => s.setSelectedClip);
+  const toggleClipSelection = useEditorStore((s) => s.toggleClipSelection);
   const applyTimelinePatch = useEditorStore((s) => s.applyTimelinePatch);
+  const addClipFromAsset = useEditorStore((s) => s.addClipFromAsset);
   const addTrack = useEditorStore((s) => s.addTrack);
+  const removeTrack = useEditorStore((s) => s.removeTrack);
+  const deleteSelectedClip = useEditorStore((s) => s.deleteSelectedClip);
+  const splitAtPlayhead = useEditorStore((s) => s.splitAtPlayhead);
+  const setZoomPxPerSec = useEditorStore((s) => s.setZoomPxPerSec);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [visibleWidth, setVisibleWidth] = useState(800);
+  const [isEditingTime, setIsEditingTime] = useState(false);
+  const [timeInputValue, setTimeInputValue] = useState("");
 
   // Track container scroll
   useEffect(() => {
@@ -38,6 +46,25 @@ export function Timeline() {
       setScrollLeft(scrollContainerRef.current.scrollLeft);
     }
   }, []);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const onWheel = (event: WheelEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      event.preventDefault();
+
+      const step = event.deltaY > 0 ? -20 : 20;
+      const currentZoom = useEditorStore.getState().zoomPxPerSec;
+      setZoomPxPerSec(clamp(currentZoom + step, MIN_ZOOM_PX_PER_SEC, MAX_ZOOM_PX_PER_SEC));
+    };
+
+    container.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", onWheel);
+    };
+  }, [setZoomPxPerSec]);
 
   // Build clips-by-track map
   const clipsByTrack = useMemo(() => {
@@ -134,12 +161,41 @@ export function Timeline() {
     [setPlayheadMs],
   );
 
-  // Ruler click sets playhead
-  const handleRulerClick = useCallback(
+  // Ruler click/drag sets playhead
+  const handleRulerScrub = useCallback(
     (ms: number) => {
       setPlayheadMs(ms);
     },
     [setPlayheadMs],
+  );
+
+  const handleDropAssetToTrack = useCallback(
+    (trackId: string, ms: number, assetId: string) => {
+      void addClipFromAsset(assetId, trackId, ms);
+    },
+    [addClipFromAsset],
+  );
+
+  const handleClipContextMenu = useCallback(
+    (_e: React.MouseEvent, clip: Clip) => {
+      toggleClipSelection(clip.id, false);
+    },
+    [toggleClipSelection],
+  );
+
+  const handleCommitTimeInput = useCallback(() => {
+    const parsedMs = parseTimecodeToMs(timeInputValue, timeline?.fps ?? 30);
+    setIsEditingTime(false);
+    setTimeInputValue("");
+    if (parsedMs === null) return;
+    setPlayheadMs(Math.max(0, Math.min(parsedMs, durationMs)));
+  }, [durationMs, setPlayheadMs, timeInputValue, timeline?.fps]);
+
+  const handleDeleteTrack = useCallback(
+    (trackId: string) => {
+      void removeTrack(trackId);
+    },
+    [removeTrack],
   );
 
   const tracks = timeline?.tracks ?? [];
@@ -148,8 +204,40 @@ export function Timeline() {
   return (
     <div className="timeline-container">
       <div className="timeline-toolbar">
-        <button onClick={() => void addTrack("video")} type="button">+ Video Track</button>
-        <button onClick={() => void addTrack("audio")} type="button">+ Audio Track</button>
+        <div className="timeline-toolbar-group">
+          <button onClick={() => void addTrack("video")} type="button">+ Video Track</button>
+          <button onClick={() => void addTrack("audio")} type="button">+ Audio Track</button>
+        </div>
+        <div className="timeline-toolbar-group">
+          <button onClick={() => void splitAtPlayhead()} title="Split selected clip (S)" type="button">Split</button>
+          <button disabled={!selectedClipId} onClick={() => void deleteSelectedClip()} title="Delete selected clip" type="button">
+            Delete
+          </button>
+        </div>
+        <div className="timeline-toolbar-group timeline-toolbar-zoom">
+          <button
+            onClick={() => setZoomPxPerSec(clamp(zoomPxPerSec - 20, MIN_ZOOM_PX_PER_SEC, MAX_ZOOM_PX_PER_SEC))}
+            title="Zoom out"
+            type="button"
+          >
+            −
+          </button>
+          <button
+            className="timeline-zoom-pill"
+            onClick={() => setZoomPxPerSec(100)}
+            title="Reset zoom"
+            type="button"
+          >
+            {Math.round((zoomPxPerSec / 100) * 100)}%
+          </button>
+          <button
+            onClick={() => setZoomPxPerSec(clamp(zoomPxPerSec + 20, MIN_ZOOM_PX_PER_SEC, MAX_ZOOM_PX_PER_SEC))}
+            title="Zoom in"
+            type="button"
+          >
+            +
+          </button>
+        </div>
       </div>
       <div
         className="timeline-scroll-area"
@@ -158,33 +246,73 @@ export function Timeline() {
       >
         <div className="timeline-content" style={{ position: "relative" }}>
           {/* Ruler */}
-          <div className="timeline-ruler-row" style={{ paddingLeft: TRACK_HEADER_WIDTH_PX }}>
+          <div className="timeline-ruler-row">
+            <div className="timeline-ruler-readout">
+              {isEditingTime ? (
+                <input
+                  value={timeInputValue}
+                  onBlur={handleCommitTimeInput}
+                  onChange={(event) => setTimeInputValue(event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      handleCommitTimeInput();
+                    } else if (event.key === "Escape") {
+                      setIsEditingTime(false);
+                      setTimeInputValue("");
+                    }
+                  }}
+                  autoFocus
+                />
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsEditingTime(true);
+                    setTimeInputValue(msToClockTimecode(playheadMs));
+                  }}
+                  title="Jump to time (HH:MM:SS.mmm or 120f)"
+                  type="button"
+                >
+                  {msToClockTimecode(playheadMs)}
+                </button>
+              )}
+            </div>
             <TimelineRuler
               durationMs={durationMs}
               zoomPxPerSec={zoomPxPerSec}
               scrollLeft={scrollLeft}
               visibleWidth={visibleWidth}
-              onClickMs={handleRulerClick}
+              playheadMs={playheadMs}
+              onScrubMs={handleRulerScrub}
             />
           </div>
 
           {/* Tracks */}
-          {tracks.map((track) => (
-            <TimelineTrack
-              key={track.id}
-              track={track}
-              clips={clipsByTrack.get(track.id) ?? []}
-              assets={assets}
-              zoomPxPerSec={zoomPxPerSec}
-              totalWidth={totalWidth}
-              isSelected={track.id === selectedTrackId}
-              selectedClipId={selectedClipId}
-              onSelectTrack={setSelectedTrack}
-              onSelectClip={setSelectedClip}
-              onClipDragStart={handleClipDragStart}
-              onLaneClick={handleLaneClick}
-            />
-          ))}
+          {tracks.map((track) => {
+            const trackTransitions = (timeline?.transitions ?? []).filter(
+              (t) => t.trackId === track.id,
+            );
+            return (
+              <TimelineTrack
+                key={track.id}
+                track={track}
+                clips={clipsByTrack.get(track.id) ?? []}
+                assets={assets}
+                textOverlays={timeline?.textOverlays ?? []}
+                transitions={trackTransitions}
+                zoomPxPerSec={zoomPxPerSec}
+                totalWidth={totalWidth}
+                isSelected={track.id === selectedTrackId}
+                selectedClipIds={selectedClipIds}
+                onSelectTrack={setSelectedTrack}
+                onSelectClip={toggleClipSelection}
+                onClipContextMenu={handleClipContextMenu}
+                onDeleteTrack={handleDeleteTrack}
+                onClipDragStart={handleClipDragStart}
+                onLaneClick={handleLaneClick}
+                onDropAsset={handleDropAssetToTrack}
+              />
+            );
+          })}
 
           {/* Playhead overlay */}
           <div className="timeline-playhead-overlay" style={{ left: TRACK_HEADER_WIDTH_PX }}>

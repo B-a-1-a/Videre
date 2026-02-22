@@ -45,6 +45,22 @@ pub struct ProjectSnapshot {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ProjectStateDto {
+    pub timeline: serde_json::Value,
+    pub text_bin_items: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectStateSnapshot {
+    pub summary: ProjectSummary,
+    pub assets: Vec<MediaAsset>,
+    pub timeline: serde_json::Value,
+    pub text_bin_items: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SaveResult {
     pub project_id: String,
     pub saved_at: String,
@@ -105,12 +121,42 @@ pub struct Clip {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TextOverlay {
+    pub id: String,
+    pub clip_id: String,
+    pub content: String,
+    pub font_family: String,
+    pub font_size: i64,
+    pub font_weight: String,
+    pub font_color: String,
+    pub background_color: Option<String>,
+    pub text_align: String,
+    pub position_x: f64,
+    pub position_y: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Transition {
+    pub id: String,
+    pub project_id: String,
+    pub track_id: String,
+    pub from_clip_id: String,
+    pub to_clip_id: String,
+    pub transition_type: String,
+    pub duration_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TimelineDto {
     pub project_id: String,
     pub fps: i64,
     pub duration_ms: i64,
     pub tracks: Vec<Track>,
     pub clips: Vec<Clip>,
+    pub text_overlays: Vec<TextOverlay>,
+    pub transitions: Vec<Transition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -159,6 +205,50 @@ pub enum TimelineOperation {
     DeleteClip {
         clip_id: String,
     },
+    AddTextClip {
+        track_id: String,
+        timeline_start_ms: i64,
+        duration_ms: i64,
+        content: String,
+        font_family: Option<String>,
+        font_size: Option<i64>,
+        font_color: Option<String>,
+        font_weight: Option<String>,
+        text_align: Option<String>,
+        position_x: Option<f64>,
+        position_y: Option<f64>,
+    },
+    UpdateTextOverlay {
+        clip_id: String,
+        content: Option<String>,
+        font_family: Option<String>,
+        font_size: Option<i64>,
+        font_color: Option<String>,
+        font_weight: Option<String>,
+        text_align: Option<String>,
+        background_color: Option<String>,
+        position_x: Option<f64>,
+        position_y: Option<f64>,
+    },
+    AddTransition {
+        track_id: String,
+        from_clip_id: String,
+        to_clip_id: String,
+        transition_type: String,
+        duration_ms: i64,
+    },
+    UpdateTransition {
+        transition_id: String,
+        transition_type: Option<String>,
+        duration_ms: Option<i64>,
+    },
+    DeleteTransition {
+        transition_id: String,
+    },
+    SetLinkedGroup {
+        clip_id: String,
+        linked_group_id: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -197,4 +287,18 @@ pub struct AnalysisJobDto {
     pub job_kind: String,
     pub status: JobStatus,
     pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageStatsDto {
+    pub used_bytes: i64,
+    pub limit_bytes: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenderCapabilitiesDto {
+    pub remotion_enabled: bool,
+    pub reason: Option<String>,
 }

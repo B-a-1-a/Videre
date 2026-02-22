@@ -49,12 +49,40 @@ export interface Clip {
   gainDb?: number;
 }
 
+export interface TextOverlay {
+  id: string;
+  clipId: string;
+  content: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: string;
+  fontColor: string;
+  backgroundColor?: string;
+  textAlign: string;
+  positionX: number;
+  positionY: number;
+}
+
+export interface Transition {
+  id: string;
+  projectId: string;
+  trackId: string;
+  fromClipId: string;
+  toClipId: string;
+  transitionType: string;
+  durationMs: number;
+}
+
+export type TransitionType = "fade" | "slide" | "wipe" | "flip" | "clockwipe" | "iris";
+
 export interface TimelineDto {
   projectId: string;
   fps: number;
   durationMs: number;
   tracks: Track[];
   clips: Clip[];
+  textOverlays: TextOverlay[];
+  transitions: Transition[];
 }
 
 export interface ProjectSnapshot {
@@ -95,7 +123,45 @@ export type TimelineOperation =
   | { type: "move_clip"; clipId: string; trackId?: string; timelineStartMs: number }
   | { type: "trim_clip"; clipId: string; sourceInMs: number; sourceOutMs: number }
   | { type: "split_clip"; clipId: string; atTimelineMs: number }
-  | { type: "delete_clip"; clipId: string };
+  | { type: "delete_clip"; clipId: string }
+  | {
+      type: "add_text_clip";
+      trackId: string;
+      timelineStartMs: number;
+      durationMs: number;
+      content: string;
+      fontFamily?: string;
+      fontSize?: number;
+      fontColor?: string;
+      fontWeight?: string;
+      textAlign?: string;
+      positionX?: number;
+      positionY?: number;
+    }
+  | {
+      type: "update_text_overlay";
+      clipId: string;
+      content?: string;
+      fontFamily?: string;
+      fontSize?: number;
+      fontColor?: string;
+      fontWeight?: string;
+      textAlign?: string;
+      backgroundColor?: string;
+      positionX?: number;
+      positionY?: number;
+    }
+  | {
+      type: "add_transition";
+      trackId: string;
+      fromClipId: string;
+      toClipId: string;
+      transitionType: string;
+      durationMs: number;
+    }
+  | { type: "update_transition"; transitionId: string; transitionType?: string; durationMs?: number }
+  | { type: "delete_transition"; transitionId: string }
+  | { type: "set_linked_group"; clipId: string; linkedGroupId?: string };
 
 export interface TimelinePatchDto {
   operations: TimelineOperation[];

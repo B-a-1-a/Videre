@@ -1,20 +1,47 @@
 import { open } from "@tauri-apps/plugin-dialog";
+import { useEffect, useState } from "react";
+import { renderCapabilities } from "../../lib/ipc";
 import { useEditorStore } from "../../store/editorStore";
 import { MIN_ZOOM_PX_PER_SEC, MAX_ZOOM_PX_PER_SEC } from "./constants";
 
 export function Toolbar() {
+  const [canRender, setCanRender] = useState(false);
+  const [renderReason, setRenderReason] = useState<string>("Checking render capabilities...");
   const currentProject = useEditorStore((s) => s.currentProject);
   const loading = useEditorStore((s) => s.loading);
   const statusMessage = useEditorStore((s) => s.statusMessage);
   const errorMessage = useEditorStore((s) => s.errorMessage);
   const renderJob = useEditorStore((s) => s.renderJob);
   const zoomPxPerSec = useEditorStore((s) => s.zoomPxPerSec);
+  const canUndo = useEditorStore((s) => s.canUndo);
+  const canRedo = useEditorStore((s) => s.canRedo);
+  const undo = useEditorStore((s) => s.undo);
+  const redo = useEditorStore((s) => s.redo);
   const closeProject = useEditorStore((s) => s.closeProject);
   const saveProject = useEditorStore((s) => s.saveProject);
   const importMedia = useEditorStore((s) => s.importMedia);
   const startRender = useEditorStore((s) => s.startRender);
   const cancelRender = useEditorStore((s) => s.cancelRender);
   const setZoomPxPerSec = useEditorStore((s) => s.setZoomPxPerSec);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const capabilities = await renderCapabilities();
+        if (cancelled) return;
+        setCanRender(capabilities.remotionEnabled);
+        setRenderReason(capabilities.reason || "");
+      } catch {
+        if (cancelled) return;
+        setCanRender(false);
+        setRenderReason("Unable to detect render capabilities.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleImport() {
     const filePaths = await open({
@@ -49,6 +76,13 @@ export function Toolbar() {
       </div>
 
       <div className="topbar-right">
+        <button disabled={!canUndo} onClick={() => void undo()} title="Undo (Ctrl+Z)" type="button">
+          Undo
+        </button>
+        <button disabled={!canRedo} onClick={() => void redo()} title="Redo (Ctrl+Shift+Z)" type="button">
+          Redo
+        </button>
+        <div className="topbar-sep" />
         <button disabled={loading} onClick={() => void handleImport()} type="button">
           Import
         </button>
@@ -57,9 +91,9 @@ export function Toolbar() {
         </button>
         <div className="topbar-sep" />
         <button
-          disabled={isFFmpegActive}
+          disabled={isFFmpegActive || !canRender}
           onClick={() => void startRender({ outputName: "output.mp4" })}
-          title="Full-quality FFmpeg render"
+          title={canRender ? "Dev Remotion export" : renderReason}
           type="button"
         >
           {isFFmpegActive && renderJob ? `${(renderJob.progress * 100).toFixed(0)}%…` : "Export"}

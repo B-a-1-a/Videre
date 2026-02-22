@@ -2,6 +2,18 @@
 
 Videre is a local-first desktop video editor built with Tauri + React + TypeScript.
 
+## Current Status (Klyp Cutover)
+
+- The frontend now runs on route-based navigation with:
+  - `/` landing (Videre home flow)
+  - `/projects` dashboard
+  - `/project/:id` editor
+  - `/profile` local profile view
+- A desktop adapter layer is available at `src/app/lib/desktopApi.ts` for project/media/render/analysis operations.
+- The app remains local-first (no cloud auth backend).
+- Project compatibility is hard-reset oriented for the new canonical state fields.
+- Dev/export note: a Remotion capability probe is exposed, while production bundles still require explicit render runtime setup.
+
 ## Implemented in this baseline
 
 - Local project lifecycle:

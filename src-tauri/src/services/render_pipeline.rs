@@ -30,6 +30,7 @@ struct RenderEvent {
 
 #[derive(Debug, Clone)]
 struct RenderClipInput {
+    id: String,
     track_kind: String,
     track_order: i64,
     asset_kind: String,
@@ -39,6 +40,28 @@ struct RenderClipInput {
     source_in_ms: i64,
     source_out_ms: i64,
     gain_db: Option<f64>,
+}
+
+#[derive(Debug, Clone)]
+struct RenderTextOverlay {
+    timeline_start_ms: i64,
+    duration_ms: i64,
+    content: String,
+    font_family: String,
+    font_size: i64,
+    font_color: String,
+    font_weight: String,
+    text_align: String,
+    position_x: f64,
+    position_y: f64,
+}
+
+#[derive(Debug, Clone)]
+struct RenderTransition {
+    from_clip_id: String,
+    to_clip_id: String,
+    transition_type: String,
+    duration_ms: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -78,6 +101,8 @@ pub fn spawn_render_job(
 
             let project_settings = load_project_settings(&db_path, &project_id)?;
             let clips = load_clips_for_render(&db_path, &project_id)?;
+            let text_overlays = load_text_overlays_for_render(&db_path, &project_id)?;
+            let transitions = load_transitions_for_render(&db_path, &project_id)?;
             let duration_ms = timeline_duration_ms(&clips);
 
             if duration_ms <= 0 {
@@ -98,6 +123,8 @@ pub fn spawn_render_job(
                 &project_root,
                 &output_path,
                 &clips,
+                &text_overlays,
+                &transitions,
                 duration_ms,
                 ProjectVideoSettings {
                     width: settings.width.unwrap_or(project_settings.width),
@@ -178,7 +205,7 @@ fn load_clips_for_render(db_path: &Path, project_id: &str) -> anyhow::Result<Vec
     let conn = open_connection(db_path).map_err(|e| anyhow::anyhow!(e.message))?;
 
     let mut stmt = conn.prepare(
-        "SELECT t.kind, t.order_index, ma.kind, ma.sample_rate, ma.managed_path,
+        "SELECT c.id, t.kind, t.order_index, ma.kind, ma.sample_rate, ma.managed_path,
                 c.timeline_start_ms, c.source_in_ms, c.source_out_ms, c.gain_db
          FROM clips c
          JOIN tracks t ON t.id = c.track_id
@@ -189,15 +216,16 @@ fn load_clips_for_render(db_path: &Path, project_id: &str) -> anyhow::Result<Vec
 
     let rows = stmt.query_map(params![project_id], |row| {
         Ok(RenderClipInput {
-            track_kind: row.get(0)?,
-            track_order: row.get(1)?,
-            asset_kind: row.get(2)?,
-            has_audio: row.get::<_, Option<i64>>(3)?.is_some(),
-            managed_path: row.get(4)?,
-            timeline_start_ms: row.get(5)?,
-            source_in_ms: row.get(6)?,
-            source_out_ms: row.get(7)?,
-            gain_db: row.get(8)?,
+            id: row.get(0)?,
+            track_kind: row.get(1)?,
+            track_order: row.get(2)?,
+            asset_kind: row.get(3)?,
+            has_audio: row.get::<_, Option<i64>>(4)?.is_some(),
+            managed_path: row.get(5)?,
+            timeline_start_ms: row.get(6)?,
+            source_in_ms: row.get(7)?,
+            source_out_ms: row.get(8)?,
+            gain_db: row.get(9)?,
         })
     })?;
 
@@ -209,6 +237,65 @@ fn load_clips_for_render(db_path: &Path, project_id: &str) -> anyhow::Result<Vec
     Ok(output)
 }
 
+fn load_text_overlays_for_render(db_path: &Path, project_id: &str) -> anyhow::Result<Vec<RenderTextOverlay>> {
+    let conn = open_connection(db_path).map_err(|e| anyhow::anyhow!(e.message))?;
+
+    let mut stmt = conn.prepare(
+        "SELECT c.timeline_start_ms, c.source_out_ms - c.source_in_ms,
+                t.content, t.font_family, t.font_size, t.font_color, t.font_weight, t.text_align,
+                t.position_x, t.position_y
+         FROM clips c
+         JOIN text_overlays t ON t.clip_id = c.id
+         WHERE c.project_id = ?1 AND c.asset_id = '__text__'",
+    )?;
+
+    let rows = stmt.query_map(params![project_id], |row| {
+        Ok(RenderTextOverlay {
+            timeline_start_ms: row.get(0)?,
+            duration_ms: row.get(1)?,
+            content: row.get(2)?,
+            font_family: row.get(3)?,
+            font_size: row.get(4)?,
+            font_color: row.get(5)?,
+            font_weight: row.get(6)?,
+            text_align: row.get(7)?,
+            position_x: row.get(8)?,
+            position_y: row.get(9)?,
+        })
+    })?;
+
+    let mut output = Vec::new();
+    for row in rows {
+        output.push(row?);
+    }
+    Ok(output)
+}
+
+fn load_transitions_for_render(db_path: &Path, project_id: &str) -> anyhow::Result<Vec<RenderTransition>> {
+    let conn = open_connection(db_path).map_err(|e| anyhow::anyhow!(e.message))?;
+
+    let mut stmt = conn.prepare(
+        "SELECT from_clip_id, to_clip_id, transition_type, duration_ms
+         FROM transitions
+         WHERE project_id = ?1",
+    )?;
+
+    let rows = stmt.query_map(params![project_id], |row| {
+        Ok(RenderTransition {
+            from_clip_id: row.get(0)?,
+            to_clip_id: row.get(1)?,
+            transition_type: row.get(2)?,
+            duration_ms: row.get(3)?,
+        })
+    })?;
+
+    let mut output = Vec::new();
+    for row in rows {
+        output.push(row?);
+    }
+    Ok(output)
+}
+
 fn timeline_duration_ms(clips: &[RenderClipInput]) -> i64 {
     clips
         .iter()
@@ -217,11 +304,32 @@ fn timeline_duration_ms(clips: &[RenderClipInput]) -> i64 {
         .unwrap_or(0)
 }
 
+/// Maps our transition type names to additional FFmpeg fade filter parameters.
+/// The fade filter itself handles the alpha; for non-fade types we still use fade
+/// but could add additional effects in the future.
+fn map_transition_to_ffmpeg_fade(transition_type: &str) -> &'static str {
+    // FFmpeg's fade filter supports color parameter for some effects.
+    // For now, all transition types use standard alpha fade (crossfade via overlay).
+    // More advanced types (wipe, iris, etc.) would need xfade which requires
+    // a different filter graph structure. This gives a good visual result for all types.
+    match transition_type {
+        "fade" => "",
+        "slide" => "",
+        "wipe" => "",
+        "flip" => "",
+        "clockwipe" => "",
+        "iris" => "",
+        _ => "",
+    }
+}
+
 fn execute_ffmpeg_render(
     app: &tauri::AppHandle,
     project_root: &Path,
     output_path: &Path,
     clips: &[RenderClipInput],
+    text_overlays: &[RenderTextOverlay],
+    transitions: &[RenderTransition],
     duration_ms: i64,
     settings: ProjectVideoSettings,
     cancel_flag: Arc<std::sync::atomic::AtomicBool>,
@@ -278,7 +386,15 @@ fn execute_ffmpeg_render(
         .cloned()
         .collect::<Vec<_>>();
 
-    video_inputs.sort_by_key(|slot| (slot.clip.track_order, slot.clip.timeline_start_ms));
+    // Overlay applies the later input on top, so render lower tracks first and higher tracks last.
+    // In this timeline, lower order_index means higher on screen.
+    video_inputs.sort_by(|left, right| {
+        right
+            .clip
+            .track_order
+            .cmp(&left.clip.track_order)
+            .then_with(|| left.clip.timeline_start_ms.cmp(&right.clip.timeline_start_ms))
+    });
     audio_inputs.sort_by_key(|slot| (slot.clip.track_order, slot.clip.timeline_start_ms));
 
     if video_inputs.is_empty() {
@@ -313,18 +429,121 @@ fn execute_ffmpeg_render(
         }
     }
 
+    // Apply transition effects (fade in/out) on individual clip streams before overlay.
+    // When a transition exists between clip A → clip B, we fade-out A's tail and fade-in B's head.
+    // With overlay compositing, this produces a natural crossfade.
+    let from_clip_transitions: std::collections::HashMap<&str, &RenderTransition> = transitions
+        .iter()
+        .map(|t| (t.from_clip_id.as_str(), t))
+        .collect();
+    let to_clip_transitions: std::collections::HashMap<&str, &RenderTransition> = transitions
+        .iter()
+        .map(|t| (t.to_clip_id.as_str(), t))
+        .collect();
+
+    for (idx, slot) in video_inputs.iter().enumerate() {
+        let clip_dur_sec = (slot.clip.source_out_ms - slot.clip.source_in_ms) as f64 / 1000.0;
+        let mut effects = Vec::new();
+
+        // Fade-out at end if this clip is the "from" in a transition
+        if let Some(trans) = from_clip_transitions.get(slot.clip.id.as_str()) {
+            let fade_dur = trans.duration_ms as f64 / 1000.0;
+            let fade_start = (clip_dur_sec - fade_dur).max(0.0);
+            let transition_name = map_transition_to_ffmpeg_fade(&trans.transition_type);
+            effects.push(format!(
+                "fade=t=out:st={fade_start:.3}:d={fade_dur:.3}{transition_name}"
+            ));
+        }
+
+        // Fade-in at start if this clip is the "to" in a transition
+        if let Some(trans) = to_clip_transitions.get(slot.clip.id.as_str()) {
+            let fade_dur = trans.duration_ms as f64 / 1000.0;
+            let transition_name = map_transition_to_ffmpeg_fade(&trans.transition_type);
+            effects.push(format!(
+                "fade=t=in:st=0:d={fade_dur:.3}{transition_name}"
+            ));
+        }
+
+        if !effects.is_empty() {
+            // Re-label the stream through the fade filters
+            let fade_chain = effects.join(",");
+            filter_parts.push(format!("[v{idx}]{fade_chain}[v{idx}f]"));
+        }
+    }
+
     let mut current_video = "[0:v]".to_string();
     for idx in 0..video_inputs.len() {
+        let clip_id = &video_inputs[idx].clip.id;
+        let has_fade = from_clip_transitions.contains_key(clip_id.as_str())
+            || to_clip_transitions.contains_key(clip_id.as_str());
+        let stream_label = if has_fade {
+            format!("[v{idx}f]")
+        } else {
+            format!("[v{idx}]")
+        };
+
         let out_label = if idx == video_inputs.len() - 1 {
             "[vout]".to_string()
         } else {
             format!("[vtmp{idx}]")
         };
         filter_parts.push(format!(
-            "{current_video}[v{idx}]overlay=eof_action=pass:shortest=0{out_label}"
+            "{current_video}{stream_label}overlay=eof_action=pass:shortest=0{out_label}"
         ));
         current_video = out_label;
     }
+
+    // Add drawtext filters for text overlays
+    if !text_overlays.is_empty() {
+        let mut text_chain = Vec::new();
+        for overlay in text_overlays {
+            let start_sec = overlay.timeline_start_ms as f64 / 1000.0;
+            let end_sec = (overlay.timeline_start_ms + overlay.duration_ms) as f64 / 1000.0;
+
+            // Escape special characters for FFmpeg drawtext
+            let escaped_text = overlay
+                .content
+                .replace('\\', "\\\\")
+                .replace('\'', "'\\''")
+                .replace(':', "\\:")
+                .replace('%', "%%");
+
+            // Map font_weight to a bold flag or fontsize multiplier
+            let font_style = if overlay.font_weight == "bold" || overlay.font_weight == "700" {
+                ":bold=1"
+            } else {
+                ""
+            };
+
+            // Position: position_x/position_y are 0..1 fractions of canvas
+            let x_expr = format!("(w*{:.3}-tw/2)", overlay.position_x);
+            let y_expr = format!("(h*{:.3}-th/2)", overlay.position_y);
+
+            text_chain.push(format!(
+                "drawtext=text='{escaped_text}':fontsize={}:fontcolor={}:fontfamily={}:x={x_expr}:y={y_expr}{font_style}:enable='between(t,{start_sec:.3},{end_sec:.3})'",
+                overlay.font_size,
+                overlay.font_color,
+                overlay.font_family.replace(':', "\\:"),
+            ));
+        }
+
+        // Chain: [vout]drawtext=...,...drawtext=...[vtxt]
+        let label_in = "[vout]";
+        let label_out = "[vtxt]";
+        filter_parts.push(format!(
+            "{label_in}{}{label_out}",
+            text_chain.join(",")
+        ));
+
+        // Replace the video output map label
+        // We'll map [vtxt] instead of [vout]
+    }
+
+    let video_out_label = if !text_overlays.is_empty() {
+        "[vtxt]"
+    } else {
+        "[vout]"
+    };
 
     let mut audio_label_inputs = Vec::new();
     for (idx, slot) in audio_inputs.iter().enumerate() {
@@ -353,7 +572,7 @@ fn execute_ffmpeg_render(
     }
 
     cmd.arg("-filter_complex").arg(filter_parts.join(";"));
-    cmd.arg("-map").arg("[vout]");
+    cmd.arg("-map").arg(video_out_label);
     if !audio_label_inputs.is_empty() {
         cmd.arg("-map").arg("[aout]");
     }
