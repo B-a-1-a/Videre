@@ -44,12 +44,14 @@ export type CaptionTextStyle = {
   color: string;
   textAlign: "left" | "center" | "right";
   fontWeight: "normal" | "bold";
+  template?: "normal" | "dynamic";
 };
 
 export type GenerateClipCaptionsRequest = {
   referenceScrubberId: string;
   segments: Array<{
     text: string;
+    words?: { text: string; start: number; end: number }[];
     startSec: number;
     endSec: number;
   }>;

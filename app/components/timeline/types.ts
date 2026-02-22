@@ -35,7 +35,8 @@ export interface TextProperties {
   color: string;
   textAlign: "left" | "center" | "right";
   fontWeight: "normal" | "bold";
-  template: "normal" | "glassy" | null;          // template uses tiktok style pages. null for normal text. templates might override the text properties.
+  template: "normal" | "glassy" | "dynamic" | null;          // template uses tiktok style pages. null for normal text. templates might override the text properties.
+  words?: { text: string; start: number; end: number }[];    // optional word timings for dynamic captions
 }
 
 // state of the scrubber in the media bin

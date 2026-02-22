@@ -122,8 +122,8 @@ export default function LeftPanel({
               asChild
               className="h-8 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
             >
-              <Link to="text-editor" className="flex items-center gap-1.5">
-                <Type className="h-3 w-3" />
+              <Link to="text-editor" className="flex items-center justify-center">
+                <span className="text-sm font-medium">T</span>
               </Link>
             </TabsTrigger>
             <TabsTrigger
@@ -131,7 +131,7 @@ export default function LeftPanel({
               asChild
               className="h-8 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
             >
-              <Link to="captions" className="flex items-center gap-1.5 text-[10px] font-semibold">
+              <Link to="captions" className="flex items-center justify-center text-[10px] font-semibold">
                 CC
               </Link>
             </TabsTrigger>

@@ -12,7 +12,6 @@ import { Toaster } from "./components/ui/sonner";
 import { ThemeProvider } from "./components/ui/ThemeProvider";
 
 export const links = () => [
-  { rel: "icon", href: "/favicon.png" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",

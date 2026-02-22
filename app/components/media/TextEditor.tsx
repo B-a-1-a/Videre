@@ -126,39 +126,39 @@ const STYLE_PRESETS: Array<{
   weight: "normal" | "bold";
   align: "left" | "center" | "right";
 }> = [
-  {
-    id: "clean-subtitle",
-    label: "Clean Subtitle",
-    font: "Inter, ui-sans-serif, system-ui, sans-serif",
-    size: 54,
-    weight: "normal",
-    align: "center",
-  },
-  {
-    id: "bold-impact",
-    label: "Bold Impact",
-    font: "'Bebas Neue', Impact, 'Arial Narrow', sans-serif",
-    size: 64,
-    weight: "bold",
-    align: "center",
-  },
-  {
-    id: "doc-style",
-    label: "Doc Style",
-    font: "'Nunito Sans', Inter, ui-sans-serif, system-ui, sans-serif",
-    size: 48,
-    weight: "normal",
-    align: "left",
-  },
-  {
-    id: "tech-mono",
-    label: "Tech Mono",
-    font: "'JetBrains Mono', Menlo, Consolas, monospace",
-    size: 46,
-    weight: "bold",
-    align: "center",
-  },
-];
+    {
+      id: "clean-subtitle",
+      label: "Clean Subtitle",
+      font: "Inter, ui-sans-serif, system-ui, sans-serif",
+      size: 54,
+      weight: "normal",
+      align: "center",
+    },
+    {
+      id: "bold-impact",
+      label: "Bold Impact",
+      font: "'Bebas Neue', Impact, 'Arial Narrow', sans-serif",
+      size: 64,
+      weight: "bold",
+      align: "center",
+    },
+    {
+      id: "doc-style",
+      label: "Doc Style",
+      font: "'Nunito Sans', Inter, ui-sans-serif, system-ui, sans-serif",
+      size: 48,
+      weight: "normal",
+      align: "left",
+    },
+    {
+      id: "tech-mono",
+      label: "Tech Mono",
+      font: "'JetBrains Mono', Menlo, Consolas, monospace",
+      size: 46,
+      weight: "bold",
+      align: "center",
+    },
+  ];
 
 const WORDS_PER_CAPTION_OPTIONS = [2, 3, 4, 5, 6, 7];
 const MAX_CAPTION_DURATION_SEC = 2.8;
@@ -243,21 +243,15 @@ function buildCaptionSegmentsFromWords(
       const startSec = chunk[0]?.start ?? 0;
       const endSec = chunk[chunk.length - 1]?.end ?? startSec;
       const text = collapseCaptionText(chunk);
-      if (!text) return null;
-      if (!Number.isFinite(startSec) || !Number.isFinite(endSec)) return null;
-      if (endSec <= startSec) return null;
-      return {
+      const result: GenerateClipCaptionsRequest["segments"][number] = {
         text,
+        words: chunk,
         startSec,
         endSec,
       };
+      return result;
     })
-    .filter(
-      (
-        segment
-      ): segment is GenerateClipCaptionsRequest["segments"][number] =>
-        Boolean(segment)
-    );
+    .filter((segment): segment is GenerateClipCaptionsRequest["segments"][number] => Boolean(segment));
 }
 
 export default function TextEditor() {
@@ -283,6 +277,7 @@ export default function TextEditor() {
   const [fontQuery, setFontQuery] = useState("");
   const [referenceScrubberId, setReferenceScrubberId] = useState("");
   const [wordsPerCaption, setWordsPerCaption] = useState(4);
+  const [captionStyle, setCaptionStyle] = useState<"normal" | "dynamic">("normal");
   const [isGeneratingCaptions, setIsGeneratingCaptions] = useState(false);
 
   const referenceCandidates = useMemo(() => {
@@ -461,6 +456,7 @@ export default function TextEditor() {
           color,
           textAlign,
           fontWeight,
+          template: captionStyle,
         },
         replaceExisting: true,
       });
@@ -491,6 +487,7 @@ export default function TextEditor() {
     onGenerateClipCaptions,
     referenceScrubberId,
     selectedReference,
+    captionStyle,
     textAlign,
     timeline,
     wordsPerCaption,
@@ -498,13 +495,12 @@ export default function TextEditor() {
 
   return (
     <div className="h-full flex flex-col bg-background">
-      <div className="flex-1 overflow-y-auto panel-scrollbar p-3">
+      <div className="flex-1 overflow-y-auto panel-scrollbar p-3 pt-8">
         <Card className="relative overflow-hidden border-border/70 bg-card/85 shadow-md">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-r from-primary/20 via-primary/5 to-transparent" />
           <CardHeader className="relative pb-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Type className="h-4 w-4 text-primary" />
                 <CardTitle className="text-sm">Text & Captions</CardTitle>
               </div>
               <Badge variant="secondary" className="h-5 px-2 text-[10px]">
@@ -519,31 +515,18 @@ export default function TextEditor() {
 
           <CardContent className="space-y-5">
             <div className="space-y-2">
-              <Label className="text-xs font-medium">Text Content</Label>
-              <textarea
-                value={textContent}
-                onChange={(event) => setTextContent(event.target.value)}
-                className="w-full h-20 rounded-lg border border-border/70 bg-muted/30 p-3 text-sm text-foreground shadow-inner focus:outline-none focus:ring-2 focus:ring-primary/35 resize-none"
-                placeholder="Type title or custom text..."
-              />
-            </div>
-
-            <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <Label className="text-xs font-medium">Font Selector</Label>
                 <Badge variant="outline" className="h-5 px-2 text-[10px]">
                   {filteredFonts.length} fonts
                 </Badge>
               </div>
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={fontQuery}
-                  onChange={(event) => setFontQuery(event.target.value)}
-                  placeholder="Search font name or category..."
-                  className="h-8 pl-8 text-xs"
-                />
-              </div>
+              <Input
+                value={fontQuery}
+                onChange={(event) => setFontQuery(event.target.value)}
+                placeholder="Search font name or category..."
+                className="h-8 text-xs"
+              />
               <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto panel-scrollbar pr-1">
                 {filteredFonts.map((font) => {
                   const isActive = font.value === fontFamily;
@@ -578,6 +561,30 @@ export default function TextEditor() {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Caption Style</Label>
+              <div className="grid grid-cols-2 rounded-md border border-border/70 overflow-hidden">
+                <Button
+                  type="button"
+                  variant={captionStyle === "normal" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setCaptionStyle("normal")}
+                  className="h-8 rounded-none border-0 text-xs"
+                >
+                  Static
+                </Button>
+                <Button
+                  type="button"
+                  variant={captionStyle === "dynamic" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setCaptionStyle("dynamic")}
+                  className="h-8 rounded-none border-0 text-xs"
+                >
+                  Dynamic
+                </Button>
               </div>
             </div>
 
@@ -631,21 +638,21 @@ export default function TextEditor() {
                 <div className="grid grid-cols-3 rounded-md border border-border/70 overflow-hidden">
                   {(
                     [
-                      { value: "left", icon: AlignLeft, label: "Left" },
-                      { value: "center", icon: AlignCenter, label: "Center" },
-                      { value: "right", icon: AlignRight, label: "Right" },
+                      { value: "left", label: "Left" },
+                      { value: "center", label: "Center" },
+                      { value: "right", label: "Right" },
                     ] as const
-                  ).map(({ value, icon: Icon, label }) => (
+                  ).map(({ value, label }) => (
                     <Button
                       key={value}
                       type="button"
                       variant={textAlign === value ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setTextAlign(value)}
-                      className="h-8 rounded-none border-0"
+                      className="h-8 rounded-none border-0 text-[10px]"
                       title={label}
                     >
-                      <Icon className="h-3.5 w-3.5" />
+                      {label}
                     </Button>
                   ))}
                 </div>
@@ -667,9 +674,9 @@ export default function TextEditor() {
                     variant={fontWeight === "bold" ? "default" : "ghost"}
                     size="sm"
                     onClick={() => setFontWeight("bold")}
-                    className="h-8 rounded-none border-0"
+                    className="h-8 rounded-none border-0 text-xs"
                   >
-                    <Bold className="h-3.5 w-3.5" />
+                    Bold
                   </Button>
                 </div>
               </div>
@@ -715,7 +722,6 @@ export default function TextEditor() {
             <div className="space-y-3 rounded-lg border border-border/70 bg-muted/15 p-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Wand2 className="h-4 w-4 text-primary" />
                   <Label className="text-xs font-medium">
                     Auto Captions From Reference Clip
                   </Label>
@@ -788,24 +794,34 @@ export default function TextEditor() {
                 className="w-full h-9"
                 size="sm"
               >
-                <Sparkles className="h-3.5 w-3.5 mr-2" />
                 {isGeneratingCaptions
                   ? "Generating Timed Captions..."
                   : "Generate Timed Captions"}
               </Button>
             </div>
 
-            <Button
-              type="button"
-              onClick={handleAddStaticText}
-              disabled={!textContent.trim()}
-              variant="secondary"
-              className="w-full h-9"
-              size="sm"
-            >
-              <Plus className="h-3.5 w-3.5 mr-2" />
-              Add Static Text to Media Bin
-            </Button>
+            <div className="space-y-3 rounded-lg border border-border/70 bg-muted/15 p-3">
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">Text Content</Label>
+                <textarea
+                  value={textContent}
+                  onChange={(event) => setTextContent(event.target.value)}
+                  className="w-full h-20 rounded-lg border border-border/70 bg-muted/30 p-3 text-sm text-foreground shadow-inner focus:outline-none focus:ring-2 focus:ring-primary/35 resize-none"
+                  placeholder="Type title or custom text..."
+                />
+              </div>
+
+              <Button
+                type="button"
+                onClick={handleAddStaticText}
+                disabled={!textContent.trim()}
+                variant="secondary"
+                className="w-full h-9"
+                size="sm"
+              >
+                Add Static Text to Media Bin
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

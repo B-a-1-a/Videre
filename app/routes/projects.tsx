@@ -273,8 +273,6 @@ export default function Projects() {
       />
       <header className="h-10 sm:h-12 border-b border-border/50 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between px-3 sm:px-6">
         <div className="flex items-center gap-2 min-w-0">
-          <VidereLogo className="h-5 w-5 shrink-0" />
-          <span className="text-sm font-medium truncate">Videre Studio</span>
         </div>
         <div className="flex items-center gap-2">
           {user && (
@@ -307,15 +305,12 @@ export default function Projects() {
                 setShowCreateModal(true);
               }}
               disabled={creating}>
-              <Plus className="h-3.5 w-3.5 mr-1" />
               New Project
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="outline" className="h-8">
-                  <ArrowUpDown className="h-3.5 w-3.5 mr-1" />
                   Sort
-                  <ChevronDown className="h-3.5 w-3.5 ml-1" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -359,9 +354,6 @@ export default function Projects() {
           </div>
         ) : projects.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-20 h-20 rounded-2xl bg-muted/30 flex items-center justify-center mb-6 border border-border/20">
-              <Clapperboard className="h-9 w-9 text-muted-foreground/40" />
-            </div>
             <h3 className="text-xl font-medium text-muted-foreground/80 mb-3">Nothing here yet...</h3>
             <div className="max-w-md space-y-2">
               <p className="text-sm text-muted-foreground/60">Your creative journey starts with a single click!</p>
@@ -455,7 +447,7 @@ export default function Projects() {
               <button
                 className="text-destructive flex items-center gap-2 text-sm"
                 onClick={() => setConfirmDeleteOpen(true)}>
-                <Trash2 className="h-4 w-4" /> Delete project
+                Delete project
               </button>
             </DrawerFooter>
           </div>
