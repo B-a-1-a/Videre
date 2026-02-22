@@ -11,6 +11,7 @@ import {
   type TimelineDataItem,
   type Transition,
   FPS,
+  type TrackTransform,
 } from "../components/timeline/types";
 import type {
   GenerateClipCaptionsRequest,
@@ -170,6 +171,12 @@ export const useTimeline = () => {
 
     const scrubbers = [];
     for (const track of timeline.tracks) {
+      const trackOffsetX = Number.isFinite(track.transform?.captionOffsetX)
+        ? Number(track.transform?.captionOffsetX)
+        : 0;
+      const trackOffsetY = Number.isFinite(track.transform?.captionOffsetY)
+        ? Number(track.transform?.captionOffsetY)
+        : 0;
       for (const scrubber of track.scrubbers) {
         scrubbers.push({
           id: scrubber.id,
@@ -183,6 +190,8 @@ export const useTimeline = () => {
           duration: scrubber.width / pixelsPerSecond,
           trackId: track.id,
           trackIndex: scrubber.y || 0,
+          trackOffsetX,
+          trackOffsetY,
           media_width: scrubber.media_width,
           media_height: scrubber.media_height,
           text: scrubber.text,
@@ -304,6 +313,34 @@ export const useTimeline = () => {
       snapshotTimeline();
       setTimeline((prev) => ({
         tracks: prev.tracks.filter((t) => t.id !== trackId),
+      }));
+    },
+    [snapshotTimeline]
+  );
+
+  const handleUpdateTrackTransform = useCallback(
+    (trackId: string, patch: Partial<TrackTransform>) => {
+      snapshotTimeline();
+      setTimeline((prev) => ({
+        ...prev,
+        tracks: prev.tracks.map((track) => {
+          if (track.id !== trackId) return track;
+          const nextOffsetXRaw = patch.captionOffsetX;
+          const nextOffsetYRaw = patch.captionOffsetY;
+          const nextOffsetX = Number.isFinite(nextOffsetXRaw)
+            ? Math.round(Number(nextOffsetXRaw))
+            : track.transform?.captionOffsetX ?? 0;
+          const nextOffsetY = Number.isFinite(nextOffsetYRaw)
+            ? Math.round(Number(nextOffsetYRaw))
+            : track.transform?.captionOffsetY ?? 0;
+          return {
+            ...track,
+            transform: {
+              captionOffsetX: nextOffsetX,
+              captionOffsetY: nextOffsetY,
+            },
+          };
+        }),
       }));
     },
     [snapshotTimeline]
@@ -1238,6 +1275,10 @@ export const useTimeline = () => {
             id: captionTrackId,
             scrubbers: [],
             transitions: [],
+            transform: {
+              captionOffsetX: 0,
+              captionOffsetY: 0,
+            },
           });
           captionTrackIndex = tracks.length - 1;
         }
@@ -2189,6 +2230,7 @@ export const useTimeline = () => {
     expandTimeline,
     handleAddTrack,
     handleDeleteTrack,
+    handleUpdateTrackTransform,
     getAllScrubbers,
     handleUpdateScrubber,
     handleDeleteScrubber,

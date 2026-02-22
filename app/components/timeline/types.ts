@@ -28,6 +28,11 @@ export interface Transition {
   // trackId: string;         // Track where this transition exists
 }
 
+export interface TrackTransform {
+  captionOffsetX: number;
+  captionOffsetY: number;
+}
+
 export interface TextProperties {
   textContent: string; // Only present when mediaType is "text"
   fontSize: number;
@@ -73,6 +78,7 @@ export interface TrackState {
   id: string;
   scrubbers: ScrubberState[];
   transitions: Transition[]; // Transitions between scrubbers on this track
+  transform?: TrackTransform;
 }
 
 // state of the timeline
@@ -86,7 +92,10 @@ export interface TimelineDataItem {
     startTime: number;
     endTime: number;
     duration: number; // TODO: this should be calculated from the start and end time, for trimming, it should be done with the trimmer. This should be refactored later.
+    trackId?: string;
     trackIndex: number; // track index in the timeline
+    trackOffsetX?: number;
+    trackOffsetY?: number;
 
     // the following are the properties of the scrubber in <Player>
     left_player: number;

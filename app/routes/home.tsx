@@ -79,6 +79,11 @@ interface Message {
   timestamp: Date;
 }
 
+const RESOLUTION_PRESETS = [
+  { id: "landscape-hd", label: "Landscape (HD)", width: 1920, height: 1080 },
+  { id: "vertical-mobile", label: "Vertical (Mobile)", width: 1080, height: 1920 },
+] as const;
+
 const EMPTY_TIMELINE: TimelineState = {
   tracks: [
     { id: "track-1", scrubbers: [], transitions: [] },
@@ -155,6 +160,7 @@ export default function TimelineEditor() {
     expandTimeline,
     handleAddTrack,
     handleDeleteTrack,
+    handleUpdateTrackTransform,
     getAllScrubbers,
     handleUpdateScrubber,
     handleDeleteScrubber,
@@ -666,9 +672,9 @@ export default function TimelineEditor() {
       return;
     }
 
-    handleRenderVideo(getTimelineData, timeline, isAutoSize ? null : width, isAutoSize ? null : height, getPixelsPerSecond);
+    handleRenderVideo(getTimelineData, timeline, width, height, getPixelsPerSecond);
     toast.info("Starting render...");
-  }, [handleRenderVideo, getTimelineData, timeline, width, height, isAutoSize, timelineData, getPixelsPerSecond]);
+  }, [handleRenderVideo, getTimelineData, timeline, width, height, timelineData, getPixelsPerSecond]);
 
   const handleLogTimelineData = useCallback(() => {
     if (timelineData.length === 0) {
@@ -703,6 +709,11 @@ export default function TimelineEditor() {
 
   const handleAutoSizeChange = useCallback((auto: boolean) => {
     setIsAutoSize(auto);
+  }, []);
+
+  const handlePresetSelect = useCallback((presetWidth: number, presetHeight: number) => {
+    setWidth(presetWidth);
+    setHeight(presetHeight);
   }, []);
 
   const handleAddTextClick = useCallback(() => {
@@ -1138,6 +1149,26 @@ export default function TimelineEditor() {
                         ref={heightInputRef}
                       />
                     </div>
+                    <div className="flex items-center gap-1 ml-1">
+                      {RESOLUTION_PRESETS.map((preset) => {
+                        const isActive =
+                          width === preset.width && height === preset.height;
+                        return (
+                          <Button
+                            key={preset.id}
+                            variant={isActive ? "default" : "ghost"}
+                            size="sm"
+                            className="h-5 px-2 text-[10px]"
+                            onClick={() =>
+                              handlePresetSelect(preset.width, preset.height)
+                            }
+                            title={`${preset.width}×${preset.height}`}
+                          >
+                            {preset.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-1">
@@ -1149,7 +1180,7 @@ export default function TimelineEditor() {
                         className="scale-75"
                       />
                       <Label htmlFor="auto-size" className="text-xs">
-                        Auto
+                        Auto Fit
                       </Label>
                     </div>
 
@@ -1321,6 +1352,7 @@ export default function TimelineEditor() {
                   onUngroupScrubber={handleUngroupSelected}
                   onMoveToMediaBin={handleMoveToMediaBinSelected}
                   onBeginScrubberTransform={snapshotTimeline}
+                  onUpdateTrackTransform={handleUpdateTrackTransform}
                 />
               </div>
             </ResizablePanel>

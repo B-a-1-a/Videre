@@ -161,14 +161,22 @@ export function TimelineComposition({
   // Helper function to create media content
   const createMediaContent = (scrubber: TimelineDataItem['scrubbers'][0] | ScrubberState): React.ReactNode => {
     let content: React.ReactNode = null;
+    const trackOffsetX =
+      "trackOffsetX" in scrubber && Number.isFinite(scrubber.trackOffsetX)
+        ? Number(scrubber.trackOffsetX)
+        : 0;
+    const trackOffsetY =
+      "trackOffsetY" in scrubber && Number.isFinite(scrubber.trackOffsetY)
+        ? Number(scrubber.trackOffsetY)
+        : 0;
 
     switch (scrubber.mediaType) {
       case "text": {
         content = (
           <AbsoluteFill
             style={{
-              left: scrubber.left_player,
-              top: scrubber.top_player,
+              left: scrubber.left_player + trackOffsetX,
+              top: scrubber.top_player + trackOffsetY,
               width: scrubber.width_player,
               height: scrubber.height_player,
               justifyContent: "center",
@@ -545,8 +553,19 @@ export function VideoPlayer({
     let maxWidth = 0;
     for (const item of timelineData) {
       for (const scrubber of item.scrubbers) {
-        if (scrubber.media_width !== null && scrubber.media_width > maxWidth) {
-          maxWidth = scrubber.media_width;
+        if (scrubber.mediaType === "audio") {
+          continue;
+        }
+        const offsetX =
+          scrubber.mediaType === "text" && Number.isFinite(scrubber.trackOffsetX)
+            ? Number(scrubber.trackOffsetX)
+            : 0;
+        const rightEdge = Math.max(
+          0,
+          scrubber.left_player + offsetX + scrubber.width_player
+        );
+        if (rightEdge > maxWidth) {
+          maxWidth = rightEdge;
         }
       }
     }
@@ -558,11 +577,19 @@ export function VideoPlayer({
     let maxHeight = 0;
     for (const item of timelineData) {
       for (const scrubber of item.scrubbers) {
-        if (
-          scrubber.media_height !== null &&
-          scrubber.media_height > maxHeight
-        ) {
-          maxHeight = scrubber.media_height;
+        if (scrubber.mediaType === "audio") {
+          continue;
+        }
+        const offsetY =
+          scrubber.mediaType === "text" && Number.isFinite(scrubber.trackOffsetY)
+            ? Number(scrubber.trackOffsetY)
+            : 0;
+        const bottomEdge = Math.max(
+          0,
+          scrubber.top_player + offsetY + scrubber.height_player
+        );
+        if (bottomEdge > maxHeight) {
+          maxHeight = bottomEdge;
         }
       }
     }
@@ -575,32 +602,94 @@ export function VideoPlayer({
   const safeHeight =
     Math.round(!compositionHeight || compositionHeight <= 0 ? 1080 : compositionHeight);
   const safeDuration = Math.max(1, durationInFrames || 1);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [fitSize, setFitSize] = React.useState({ width: safeWidth, height: safeHeight });
+
+  const updateFitSize = React.useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const availableWidth = Math.max(1, container.clientWidth);
+    const availableHeight = Math.max(1, container.clientHeight);
+    const compositionAspect = safeWidth / safeHeight;
+    const containerAspect = availableWidth / availableHeight;
+
+    let nextWidth = availableWidth;
+    let nextHeight = availableHeight;
+    if (containerAspect > compositionAspect) {
+      nextHeight = availableHeight;
+      nextWidth = Math.round(nextHeight * compositionAspect);
+    } else {
+      nextWidth = availableWidth;
+      nextHeight = Math.round(nextWidth / compositionAspect);
+    }
+
+    setFitSize((prev) => {
+      if (prev.width === nextWidth && prev.height === nextHeight) {
+        return prev;
+      }
+      return { width: nextWidth, height: nextHeight };
+    });
+  }, [safeHeight, safeWidth]);
+
+  React.useEffect(() => {
+    updateFitSize();
+    const container = containerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(() => updateFitSize());
+    observer.observe(container);
+    window.addEventListener("resize", updateFitSize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateFitSize);
+    };
+  }, [updateFitSize]);
 
   return (
-    <Player
-      ref={ref}
-      component={TimelineComposition}
-      inputProps={{
-        timelineData,
-        durationInFrames,
-        isRendering: false,
-        selectedItem,
-        setSelectedItem,
-        timeline,
-        handleUpdateScrubber,
-        getPixelsPerSecond,
-      }}
-      durationInFrames={safeDuration}
-      compositionWidth={safeWidth}
-      compositionHeight={safeHeight}
-      fps={30}
+    <div
+      ref={containerRef}
       style={{
         width: "100%",
         height: "100%",
-        position: "relative",
-        zIndex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
       }}
-      acknowledgeRemotionLicense
-    />
+    >
+      <div
+        style={{
+          width: `${fitSize.width}px`,
+          height: `${fitSize.height}px`,
+          maxWidth: "100%",
+          maxHeight: "100%",
+        }}
+      >
+        <Player
+          ref={ref}
+          component={TimelineComposition}
+          inputProps={{
+            timelineData,
+            durationInFrames,
+            isRendering: false,
+            selectedItem,
+            setSelectedItem,
+            timeline,
+            handleUpdateScrubber,
+            getPixelsPerSecond,
+          }}
+          durationInFrames={safeDuration}
+          compositionWidth={safeWidth}
+          compositionHeight={safeHeight}
+          fps={30}
+          style={{
+            width: "100%",
+            height: "100%",
+            position: "relative",
+            zIndex: 1,
+          }}
+          acknowledgeRemotionLicense
+        />
+      </div>
+    </div>
   );
 }
