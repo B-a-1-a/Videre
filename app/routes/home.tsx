@@ -138,6 +138,13 @@ export default function TimelineEditor() {
   // video player media selection state
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!selectedItem) return;
+    setSelectedScrubberIds((prev) =>
+      prev.length === 1 && prev[0] === selectedItem ? prev : [selectedItem]
+    );
+  }, [selectedItem]);
+
   const {
     timeline,
     timelineWidth,
