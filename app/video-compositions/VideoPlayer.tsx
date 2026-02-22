@@ -134,6 +134,10 @@ export function TimelineComposition({
         const imageUrl = isRendering
           ? scrubber.mediaUrlRemote || scrubber.mediaUrlLocal
           : scrubber.mediaUrlLocal || scrubber.mediaUrlRemote;
+        if (!imageUrl) {
+          console.warn("Skipping image scrubber with missing media URL", scrubber.id);
+          break;
+        }
         content = (
           <AbsoluteFill
             style={{
@@ -143,7 +147,7 @@ export function TimelineComposition({
               height: scrubber.height_player,
             }}
           >
-            <Img src={imageUrl!} />
+            <Img src={imageUrl} />
           </AbsoluteFill>
         );
         break;
@@ -152,6 +156,10 @@ export function TimelineComposition({
         const videoUrl = isRendering
           ? scrubber.mediaUrlRemote || scrubber.mediaUrlLocal
           : scrubber.mediaUrlLocal || scrubber.mediaUrlRemote;
+        if (!videoUrl) {
+          console.warn("Skipping video scrubber with missing media URL", scrubber.id);
+          break;
+        }
         content = (
           <AbsoluteFill
             style={{
@@ -162,7 +170,7 @@ export function TimelineComposition({
             }}
           >
             <Video
-              src={videoUrl!}
+              src={videoUrl}
               trimBefore={scrubber.trimBefore || undefined}
               trimAfter={scrubber.trimAfter || undefined}
             />
@@ -174,9 +182,13 @@ export function TimelineComposition({
         const audioUrl = isRendering
           ? scrubber.mediaUrlRemote || scrubber.mediaUrlLocal
           : scrubber.mediaUrlLocal || scrubber.mediaUrlRemote;
+        if (!audioUrl) {
+          console.warn("Skipping audio scrubber with missing media URL", scrubber.id);
+          break;
+        }
         content = (
           <Audio
-            src={audioUrl!}
+            src={audioUrl}
             trimBefore={scrubber.trimBefore || undefined}
             trimAfter={scrubber.trimAfter || undefined}
           />

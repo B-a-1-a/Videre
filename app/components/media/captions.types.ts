@@ -4,6 +4,13 @@ export type ClipTranscriptWord = {
   end: number;
 };
 
+export type ClipTranscriptSegment = {
+  text: string;
+  words: ClipTranscriptWord[];
+  startSec: number;
+  endSec: number;
+};
+
 export type ClipTranscriptRecord = {
   scrubberId: string;
   scrubberName: string;
@@ -17,3 +24,16 @@ export type ClipTranscriptRecord = {
 };
 
 export type ClipTranscriptsMap = Record<string, ClipTranscriptRecord>;
+
+export type ApplyTranscriptEditRequest = {
+  scrubberId: string;
+  editedText: string;
+  segments: ClipTranscriptSegment[];
+};
+
+export type ApplyTranscriptEditResult = {
+  success: boolean;
+  scrubberId: string;
+  newScrubberIds: string[];
+  error: string | null;
+};

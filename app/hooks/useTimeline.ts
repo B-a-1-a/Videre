@@ -15,6 +15,17 @@ import {
 import { generateUUID } from "../utils/uuid";
 import { toast } from "sonner";
 
+type TranscriptCutSegment = {
+  startSec: number;
+  endSec: number;
+};
+
+type ApplyTranscriptCutResult = {
+  success: boolean;
+  error: string | null;
+  newScrubbers: ScrubberState[];
+};
+
 export const useTimeline = () => {
   const [timeline, setTimeline] = useState<TimelineState>({
     // id: "main",
@@ -596,7 +607,11 @@ export const useTimeline = () => {
   }, []);
 
   const handleDropOnTrack = useCallback(
-    (item: MediaBinItem, trackId: string, dropLeftPx: number) => {
+    (
+      item: MediaBinItem,
+      trackId: string,
+      dropLeftPx: number
+    ): { scrubberId: string } | null => {
       snapshotTimeline();
       console.log(
         "Dropped",
@@ -620,22 +635,50 @@ export const useTimeline = () => {
       const targetTrackIndex = timeline.tracks.findIndex(
         (t) => t.id === trackId
       );
-      if (targetTrackIndex === -1) return;
+      if (targetTrackIndex === -1) return null;
 
-      // For text elements, provide default dimensions if they're 0
+      const defaultVisualWidth = 640;
+      const defaultVisualHeight = 360;
+      const textFallbackWidth = Math.max(
+        200,
+        (item.text?.textContent?.length || 10) * (item.text?.fontSize || 48) * 0.6
+      );
+      const textFallbackHeight = Math.max(80, (item.text?.fontSize || 48) * 1.5);
+
+      const isVisualMedia = item.mediaType === "video" || item.mediaType === "image";
+      const resolvedMediaWidth =
+        item.mediaType === "text"
+          ? item.media_width > 0
+            ? item.media_width
+            : textFallbackWidth
+          : isVisualMedia
+            ? item.media_width > 0
+              ? item.media_width
+              : defaultVisualWidth
+            : item.media_width > 0
+              ? item.media_width
+              : 0;
+      const resolvedMediaHeight =
+        item.mediaType === "text"
+          ? item.media_height > 0
+            ? item.media_height
+            : textFallbackHeight
+          : isVisualMedia
+            ? item.media_height > 0
+              ? item.media_height
+              : defaultVisualHeight
+            : item.media_height > 0
+              ? item.media_height
+              : 0;
+
       const playerWidth =
-        item.mediaType === "text" && item.media_width === 0
-          ? Math.max(
-            200,
-            (item.text?.textContent?.length || 10) *
-            (item.text?.fontSize || 48) *
-            0.6
-          )
-          : item.media_width;
+        item.mediaType === "audio" || item.mediaType === "groupped_scrubber"
+          ? 0
+          : resolvedMediaWidth;
       const playerHeight =
-        item.mediaType === "text" && item.media_height === 0
-          ? Math.max(80, (item.text?.fontSize || 48) * 1.5)
-          : item.media_height;
+        item.mediaType === "audio" || item.mediaType === "groupped_scrubber"
+          ? 0
+          : resolvedMediaHeight;
 
       // Generate new UUIDs for grouped scrubbers and their transitions to prevent collisions when ungrouping
       const allTransitions = getAllTransitions();
@@ -657,8 +700,8 @@ export const useTimeline = () => {
         y: targetTrackIndex,
         name: item.name,
         durationInSeconds: item.durationInSeconds,
-        media_width: item.media_width,
-        media_height: item.media_height,
+        media_width: resolvedMediaWidth,
+        media_height: resolvedMediaHeight,
         text: item.text,
         groupped_scrubbers: processedGroupedScrubbers,
         sourceMediaBinId: item.id,
@@ -700,6 +743,8 @@ export const useTimeline = () => {
       } else {
         handleAddScrubberToTrack(trackId, newScrubber);
       }
+
+      return { scrubberId: newScrubber.id };
     }, [
     timeline.tracks,
     handleAddScrubberToTrack,
@@ -793,6 +838,161 @@ export const useTimeline = () => {
       return 1; // One scrubber was split
     },
     [timeline, getPixelsPerSecond, snapshotTimeline]
+  );
+
+  const handleCutScrubberWithSegments = useCallback(
+    (
+      scrubberId: string,
+      rawSegments: TranscriptCutSegment[]
+    ): ApplyTranscriptCutResult => {
+      const trackIndex = timeline.tracks.findIndex((track) =>
+        track.scrubbers.some((scrubber) => scrubber.id === scrubberId)
+      );
+      if (trackIndex < 0) {
+        return {
+          success: false,
+          error: "Clip was not found in the timeline.",
+          newScrubbers: [],
+        };
+      }
+
+      const track = timeline.tracks[trackIndex];
+      const target = track.scrubbers.find((scrubber) => scrubber.id === scrubberId);
+      if (!target) {
+        return {
+          success: false,
+          error: "Clip was not found in the timeline.",
+          newScrubbers: [],
+        };
+      }
+
+      if (target.mediaType !== "video" && target.mediaType !== "audio") {
+        return {
+          success: false,
+          error: "Only video/audio clips can be cut from transcript edits.",
+          newScrubbers: [],
+        };
+      }
+
+      if (target.left_transition_id || target.right_transition_id) {
+        return {
+          success: false,
+          error:
+            "This clip has transitions. Remove transitions before applying transcript edits.",
+          newScrubbers: [],
+        };
+      }
+
+      if (
+        !Number.isFinite(target.durationInSeconds) ||
+        Number(target.durationInSeconds) <= 0
+      ) {
+        return {
+          success: false,
+          error: "Clip duration is invalid for transcript-based cuts.",
+          newScrubbers: [],
+        };
+      }
+
+      const clipStartSec = Math.max(0, (target.trimBefore || 0) / FPS);
+      const clipEndSec = Math.max(
+        clipStartSec + 1 / FPS,
+        target.durationInSeconds - (target.trimAfter || 0) / FPS
+      );
+
+      const normalizedSegments = rawSegments
+        .filter((segment) => Number.isFinite(segment.startSec) && Number.isFinite(segment.endSec))
+        .map((segment) => ({
+          startSec: Math.max(clipStartSec, Math.min(clipEndSec, Number(segment.startSec))),
+          endSec: Math.max(clipStartSec, Math.min(clipEndSec, Number(segment.endSec))),
+        }))
+        .filter((segment) => segment.endSec - segment.startSec >= 1 / FPS)
+        .sort((a, b) => a.startSec - b.startSec);
+
+      if (normalizedSegments.length === 0) {
+        return {
+          success: false,
+          error: "No valid kept segments were found in the edited transcript.",
+          newScrubbers: [],
+        };
+      }
+
+      const nonOverlapping: TranscriptCutSegment[] = [];
+      for (const segment of normalizedSegments) {
+        if (nonOverlapping.length === 0) {
+          nonOverlapping.push(segment);
+          continue;
+        }
+        const previous = nonOverlapping[nonOverlapping.length - 1];
+        if (segment.startSec <= previous.endSec) {
+          previous.endSec = Math.max(previous.endSec, segment.endSec);
+          continue;
+        }
+        nonOverlapping.push(segment);
+      }
+
+      const pixelsPerSecond = getPixelsPerSecond();
+      let nextLeft = target.left;
+      const replacementScrubbers: ScrubberState[] = nonOverlapping
+        .map((segment) => {
+          const startSec = segment.startSec;
+          const endSec = segment.endSec;
+          const durationSec = endSec - startSec;
+          if (!Number.isFinite(durationSec) || durationSec < 1 / FPS) {
+            return null;
+          }
+
+          const trimBefore = Math.max(0, Math.round(startSec * FPS));
+          const trimAfter = Math.max(
+            0,
+            Math.round((target.durationInSeconds - endSec) * FPS)
+          );
+          const width = Math.max(durationSec * pixelsPerSecond, pixelsPerSecond / FPS);
+          const newScrubber: ScrubberState = {
+            ...target,
+            id: generateUUID(),
+            left: nextLeft,
+            width,
+            trimBefore,
+            trimAfter,
+            left_transition_id: null,
+            right_transition_id: null,
+          };
+          nextLeft += width;
+          return newScrubber;
+        })
+        .filter((scrubber): scrubber is ScrubberState => scrubber !== null);
+
+      if (replacementScrubbers.length === 0) {
+        return {
+          success: false,
+          error: "Transcript edit resulted in zero usable segments.",
+          newScrubbers: [],
+        };
+      }
+
+      snapshotTimeline();
+      setTimeline((prev) => ({
+        ...prev,
+        tracks: prev.tracks.map((existingTrack) => {
+          if (existingTrack.id !== track.id) return existingTrack;
+          return {
+            ...existingTrack,
+            scrubbers: existingTrack.scrubbers.flatMap((scrubber) => {
+              if (scrubber.id !== scrubberId) return [scrubber];
+              return replacementScrubbers;
+            }),
+          };
+        }),
+      }));
+
+      return {
+        success: true,
+        error: null,
+        newScrubbers: replacementScrubbers,
+      };
+    },
+    [getPixelsPerSecond, snapshotTimeline, timeline]
   );
 
   // Transition management functions
@@ -1695,6 +1895,7 @@ export const useTimeline = () => {
     handleAddScrubberToTrack,
     handleDropOnTrack,
     handleSplitScrubberAtRuler,
+    handleCutScrubberWithSegments,
     handleZoomIn,
     handleZoomOut,
     handleZoomReset,

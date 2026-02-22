@@ -1,3 +1,6 @@
 # Tested with Python 3.11/3.12
+# Preferred low-memory backend
+faster-whisper==1.1.1
+# Optional fallback backend
 transformers==5.2.0
 torch==2.7.1
