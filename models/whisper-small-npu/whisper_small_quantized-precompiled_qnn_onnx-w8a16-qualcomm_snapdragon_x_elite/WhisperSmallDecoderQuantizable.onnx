@@ -1,0 +1,2442 @@
+Qualcomm AI Hub Workbenchaihub-2026.01.22.0:Ï³
+q
+attention_mask
+attention_mask_scale
+attention_mask_zpattention_mask_dqattention_mask_dq"DequantizeLinear
+p
+attention_mask_dq
+attention_mask_scale
+attention_mask_zpattention_mask_qattention_mask_q"QuantizeLinear
+€
+k_cache_self_0_in
+k_cache_self_0_in_scale
+k_cache_self_0_in_zpk_cache_self_0_in_dqk_cache_self_0_in_dq"DequantizeLinear
+
+k_cache_self_0_in_dq
+k_cache_self_0_in_scale
+k_cache_self_0_in_zpk_cache_self_0_in_qk_cache_self_0_in_q"QuantizeLinear
+€
+v_cache_self_0_in
+v_cache_self_0_in_scale
+v_cache_self_0_in_zpv_cache_self_0_in_dqv_cache_self_0_in_dq"DequantizeLinear
+
+v_cache_self_0_in_dq
+v_cache_self_0_in_scale
+v_cache_self_0_in_zpv_cache_self_0_in_qv_cache_self_0_in_q"QuantizeLinear
+€
+k_cache_self_1_in
+k_cache_self_1_in_scale
+k_cache_self_1_in_zpk_cache_self_1_in_dqk_cache_self_1_in_dq"DequantizeLinear
+
+k_cache_self_1_in_dq
+k_cache_self_1_in_scale
+k_cache_self_1_in_zpk_cache_self_1_in_qk_cache_self_1_in_q"QuantizeLinear
+€
+v_cache_self_1_in
+v_cache_self_1_in_scale
+v_cache_self_1_in_zpv_cache_self_1_in_dqv_cache_self_1_in_dq"DequantizeLinear
+
+v_cache_self_1_in_dq
+v_cache_self_1_in_scale
+v_cache_self_1_in_zpv_cache_self_1_in_qv_cache_self_1_in_q"QuantizeLinear
+€
+k_cache_self_2_in
+k_cache_self_2_in_scale
+k_cache_self_2_in_zpk_cache_self_2_in_dqk_cache_self_2_in_dq"DequantizeLinear
+
+k_cache_self_2_in_dq
+k_cache_self_2_in_scale
+k_cache_self_2_in_zpk_cache_self_2_in_qk_cache_self_2_in_q"QuantizeLinear
+€
+v_cache_self_2_in
+v_cache_self_2_in_scale
+v_cache_self_2_in_zpv_cache_self_2_in_dqv_cache_self_2_in_dq"DequantizeLinear
+
+v_cache_self_2_in_dq
+v_cache_self_2_in_scale
+v_cache_self_2_in_zpv_cache_self_2_in_qv_cache_self_2_in_q"QuantizeLinear
+€
+k_cache_self_3_in
+k_cache_self_3_in_scale
+k_cache_self_3_in_zpk_cache_self_3_in_dqk_cache_self_3_in_dq"DequantizeLinear
+
+k_cache_self_3_in_dq
+k_cache_self_3_in_scale
+k_cache_self_3_in_zpk_cache_self_3_in_qk_cache_self_3_in_q"QuantizeLinear
+€
+v_cache_self_3_in
+v_cache_self_3_in_scale
+v_cache_self_3_in_zpv_cache_self_3_in_dqv_cache_self_3_in_dq"DequantizeLinear
+
+v_cache_self_3_in_dq
+v_cache_self_3_in_scale
+v_cache_self_3_in_zpv_cache_self_3_in_qv_cache_self_3_in_q"QuantizeLinear
+€
+k_cache_self_4_in
+k_cache_self_4_in_scale
+k_cache_self_4_in_zpk_cache_self_4_in_dqk_cache_self_4_in_dq"DequantizeLinear
+
+k_cache_self_4_in_dq
+k_cache_self_4_in_scale
+k_cache_self_4_in_zpk_cache_self_4_in_qk_cache_self_4_in_q"QuantizeLinear
+€
+v_cache_self_4_in
+v_cache_self_4_in_scale
+v_cache_self_4_in_zpv_cache_self_4_in_dqv_cache_self_4_in_dq"DequantizeLinear
+
+v_cache_self_4_in_dq
+v_cache_self_4_in_scale
+v_cache_self_4_in_zpv_cache_self_4_in_qv_cache_self_4_in_q"QuantizeLinear
+€
+k_cache_self_5_in
+k_cache_self_5_in_scale
+k_cache_self_5_in_zpk_cache_self_5_in_dqk_cache_self_5_in_dq"DequantizeLinear
+
+k_cache_self_5_in_dq
+k_cache_self_5_in_scale
+k_cache_self_5_in_zpk_cache_self_5_in_qk_cache_self_5_in_q"QuantizeLinear
+€
+v_cache_self_5_in
+v_cache_self_5_in_scale
+v_cache_self_5_in_zpv_cache_self_5_in_dqv_cache_self_5_in_dq"DequantizeLinear
+
+v_cache_self_5_in_dq
+v_cache_self_5_in_scale
+v_cache_self_5_in_zpv_cache_self_5_in_qv_cache_self_5_in_q"QuantizeLinear
+€
+k_cache_self_6_in
+k_cache_self_6_in_scale
+k_cache_self_6_in_zpk_cache_self_6_in_dqk_cache_self_6_in_dq"DequantizeLinear
+
+k_cache_self_6_in_dq
+k_cache_self_6_in_scale
+k_cache_self_6_in_zpk_cache_self_6_in_qk_cache_self_6_in_q"QuantizeLinear
+€
+v_cache_self_6_in
+v_cache_self_6_in_scale
+v_cache_self_6_in_zpv_cache_self_6_in_dqv_cache_self_6_in_dq"DequantizeLinear
+
+v_cache_self_6_in_dq
+v_cache_self_6_in_scale
+v_cache_self_6_in_zpv_cache_self_6_in_qv_cache_self_6_in_q"QuantizeLinear
+€
+k_cache_self_7_in
+k_cache_self_7_in_scale
+k_cache_self_7_in_zpk_cache_self_7_in_dqk_cache_self_7_in_dq"DequantizeLinear
+
+k_cache_self_7_in_dq
+k_cache_self_7_in_scale
+k_cache_self_7_in_zpk_cache_self_7_in_qk_cache_self_7_in_q"QuantizeLinear
+€
+v_cache_self_7_in
+v_cache_self_7_in_scale
+v_cache_self_7_in_zpv_cache_self_7_in_dqv_cache_self_7_in_dq"DequantizeLinear
+
+v_cache_self_7_in_dq
+v_cache_self_7_in_scale
+v_cache_self_7_in_zpv_cache_self_7_in_qv_cache_self_7_in_q"QuantizeLinear
+€
+k_cache_self_8_in
+k_cache_self_8_in_scale
+k_cache_self_8_in_zpk_cache_self_8_in_dqk_cache_self_8_in_dq"DequantizeLinear
+
+k_cache_self_8_in_dq
+k_cache_self_8_in_scale
+k_cache_self_8_in_zpk_cache_self_8_in_qk_cache_self_8_in_q"QuantizeLinear
+€
+v_cache_self_8_in
+v_cache_self_8_in_scale
+v_cache_self_8_in_zpv_cache_self_8_in_dqv_cache_self_8_in_dq"DequantizeLinear
+
+v_cache_self_8_in_dq
+v_cache_self_8_in_scale
+v_cache_self_8_in_zpv_cache_self_8_in_qv_cache_self_8_in_q"QuantizeLinear
+€
+k_cache_self_9_in
+k_cache_self_9_in_scale
+k_cache_self_9_in_zpk_cache_self_9_in_dqk_cache_self_9_in_dq"DequantizeLinear
+
+k_cache_self_9_in_dq
+k_cache_self_9_in_scale
+k_cache_self_9_in_zpk_cache_self_9_in_qk_cache_self_9_in_q"QuantizeLinear
+€
+v_cache_self_9_in
+v_cache_self_9_in_scale
+v_cache_self_9_in_zpv_cache_self_9_in_dqv_cache_self_9_in_dq"DequantizeLinear
+
+v_cache_self_9_in_dq
+v_cache_self_9_in_scale
+v_cache_self_9_in_zpv_cache_self_9_in_qv_cache_self_9_in_q"QuantizeLinear
+…
+k_cache_self_10_in
+k_cache_self_10_in_scale
+k_cache_self_10_in_zpk_cache_self_10_in_dqk_cache_self_10_in_dq"DequantizeLinear
+„
+k_cache_self_10_in_dq
+k_cache_self_10_in_scale
+k_cache_self_10_in_zpk_cache_self_10_in_qk_cache_self_10_in_q"QuantizeLinear
+…
+v_cache_self_10_in
+v_cache_self_10_in_scale
+v_cache_self_10_in_zpv_cache_self_10_in_dqv_cache_self_10_in_dq"DequantizeLinear
+„
+v_cache_self_10_in_dq
+v_cache_self_10_in_scale
+v_cache_self_10_in_zpv_cache_self_10_in_qv_cache_self_10_in_q"QuantizeLinear
+…
+k_cache_self_11_in
+k_cache_self_11_in_scale
+k_cache_self_11_in_zpk_cache_self_11_in_dqk_cache_self_11_in_dq"DequantizeLinear
+„
+k_cache_self_11_in_dq
+k_cache_self_11_in_scale
+k_cache_self_11_in_zpk_cache_self_11_in_qk_cache_self_11_in_q"QuantizeLinear
+…
+v_cache_self_11_in
+v_cache_self_11_in_scale
+v_cache_self_11_in_zpv_cache_self_11_in_dqv_cache_self_11_in_dq"DequantizeLinear
+„
+v_cache_self_11_in_dq
+v_cache_self_11_in_scale
+v_cache_self_11_in_zpv_cache_self_11_in_qv_cache_self_11_in_q"QuantizeLinear
+v
+k_cache_cross_0
+k_cache_cross_0_scale
+k_cache_cross_0_zpk_cache_cross_0_dqk_cache_cross_0_dq"DequantizeLinear
+u
+k_cache_cross_0_dq
+k_cache_cross_0_scale
+k_cache_cross_0_zpk_cache_cross_0_qk_cache_cross_0_q"QuantizeLinear
+v
+v_cache_cross_0
+v_cache_cross_0_scale
+v_cache_cross_0_zpv_cache_cross_0_dqv_cache_cross_0_dq"DequantizeLinear
+u
+v_cache_cross_0_dq
+v_cache_cross_0_scale
+v_cache_cross_0_zpv_cache_cross_0_qv_cache_cross_0_q"QuantizeLinear
+v
+k_cache_cross_1
+k_cache_cross_1_scale
+k_cache_cross_1_zpk_cache_cross_1_dqk_cache_cross_1_dq"DequantizeLinear
+u
+k_cache_cross_1_dq
+k_cache_cross_1_scale
+k_cache_cross_1_zpk_cache_cross_1_qk_cache_cross_1_q"QuantizeLinear
+v
+v_cache_cross_1
+v_cache_cross_1_scale
+v_cache_cross_1_zpv_cache_cross_1_dqv_cache_cross_1_dq"DequantizeLinear
+u
+v_cache_cross_1_dq
+v_cache_cross_1_scale
+v_cache_cross_1_zpv_cache_cross_1_qv_cache_cross_1_q"QuantizeLinear
+v
+k_cache_cross_2
+k_cache_cross_2_scale
+k_cache_cross_2_zpk_cache_cross_2_dqk_cache_cross_2_dq"DequantizeLinear
+u
+k_cache_cross_2_dq
+k_cache_cross_2_scale
+k_cache_cross_2_zpk_cache_cross_2_qk_cache_cross_2_q"QuantizeLinear
+v
+v_cache_cross_2
+v_cache_cross_2_scale
+v_cache_cross_2_zpv_cache_cross_2_dqv_cache_cross_2_dq"DequantizeLinear
+u
+v_cache_cross_2_dq
+v_cache_cross_2_scale
+v_cache_cross_2_zpv_cache_cross_2_qv_cache_cross_2_q"QuantizeLinear
+v
+k_cache_cross_3
+k_cache_cross_3_scale
+k_cache_cross_3_zpk_cache_cross_3_dqk_cache_cross_3_dq"DequantizeLinear
+u
+k_cache_cross_3_dq
+k_cache_cross_3_scale
+k_cache_cross_3_zpk_cache_cross_3_qk_cache_cross_3_q"QuantizeLinear
+v
+v_cache_cross_3
+v_cache_cross_3_scale
+v_cache_cross_3_zpv_cache_cross_3_dqv_cache_cross_3_dq"DequantizeLinear
+u
+v_cache_cross_3_dq
+v_cache_cross_3_scale
+v_cache_cross_3_zpv_cache_cross_3_qv_cache_cross_3_q"QuantizeLinear
+v
+k_cache_cross_4
+k_cache_cross_4_scale
+k_cache_cross_4_zpk_cache_cross_4_dqk_cache_cross_4_dq"DequantizeLinear
+u
+k_cache_cross_4_dq
+k_cache_cross_4_scale
+k_cache_cross_4_zpk_cache_cross_4_qk_cache_cross_4_q"QuantizeLinear
+v
+v_cache_cross_4
+v_cache_cross_4_scale
+v_cache_cross_4_zpv_cache_cross_4_dqv_cache_cross_4_dq"DequantizeLinear
+u
+v_cache_cross_4_dq
+v_cache_cross_4_scale
+v_cache_cross_4_zpv_cache_cross_4_qv_cache_cross_4_q"QuantizeLinear
+v
+k_cache_cross_5
+k_cache_cross_5_scale
+k_cache_cross_5_zpk_cache_cross_5_dqk_cache_cross_5_dq"DequantizeLinear
+u
+k_cache_cross_5_dq
+k_cache_cross_5_scale
+k_cache_cross_5_zpk_cache_cross_5_qk_cache_cross_5_q"QuantizeLinear
+v
+v_cache_cross_5
+v_cache_cross_5_scale
+v_cache_cross_5_zpv_cache_cross_5_dqv_cache_cross_5_dq"DequantizeLinear
+u
+v_cache_cross_5_dq
+v_cache_cross_5_scale
+v_cache_cross_5_zpv_cache_cross_5_qv_cache_cross_5_q"QuantizeLinear
+v
+k_cache_cross_6
+k_cache_cross_6_scale
+k_cache_cross_6_zpk_cache_cross_6_dqk_cache_cross_6_dq"DequantizeLinear
+u
+k_cache_cross_6_dq
+k_cache_cross_6_scale
+k_cache_cross_6_zpk_cache_cross_6_qk_cache_cross_6_q"QuantizeLinear
+v
+v_cache_cross_6
+v_cache_cross_6_scale
+v_cache_cross_6_zpv_cache_cross_6_dqv_cache_cross_6_dq"DequantizeLinear
+u
+v_cache_cross_6_dq
+v_cache_cross_6_scale
+v_cache_cross_6_zpv_cache_cross_6_qv_cache_cross_6_q"QuantizeLinear
+v
+k_cache_cross_7
+k_cache_cross_7_scale
+k_cache_cross_7_zpk_cache_cross_7_dqk_cache_cross_7_dq"DequantizeLinear
+u
+k_cache_cross_7_dq
+k_cache_cross_7_scale
+k_cache_cross_7_zpk_cache_cross_7_qk_cache_cross_7_q"QuantizeLinear
+v
+v_cache_cross_7
+v_cache_cross_7_scale
+v_cache_cross_7_zpv_cache_cross_7_dqv_cache_cross_7_dq"DequantizeLinear
+u
+v_cache_cross_7_dq
+v_cache_cross_7_scale
+v_cache_cross_7_zpv_cache_cross_7_qv_cache_cross_7_q"QuantizeLinear
+v
+k_cache_cross_8
+k_cache_cross_8_scale
+k_cache_cross_8_zpk_cache_cross_8_dqk_cache_cross_8_dq"DequantizeLinear
+u
+k_cache_cross_8_dq
+k_cache_cross_8_scale
+k_cache_cross_8_zpk_cache_cross_8_qk_cache_cross_8_q"QuantizeLinear
+v
+v_cache_cross_8
+v_cache_cross_8_scale
+v_cache_cross_8_zpv_cache_cross_8_dqv_cache_cross_8_dq"DequantizeLinear
+u
+v_cache_cross_8_dq
+v_cache_cross_8_scale
+v_cache_cross_8_zpv_cache_cross_8_qv_cache_cross_8_q"QuantizeLinear
+v
+k_cache_cross_9
+k_cache_cross_9_scale
+k_cache_cross_9_zpk_cache_cross_9_dqk_cache_cross_9_dq"DequantizeLinear
+u
+k_cache_cross_9_dq
+k_cache_cross_9_scale
+k_cache_cross_9_zpk_cache_cross_9_qk_cache_cross_9_q"QuantizeLinear
+v
+v_cache_cross_9
+v_cache_cross_9_scale
+v_cache_cross_9_zpv_cache_cross_9_dqv_cache_cross_9_dq"DequantizeLinear
+u
+v_cache_cross_9_dq
+v_cache_cross_9_scale
+v_cache_cross_9_zpv_cache_cross_9_qv_cache_cross_9_q"QuantizeLinear
+{
+k_cache_cross_10
+k_cache_cross_10_scale
+k_cache_cross_10_zpk_cache_cross_10_dqk_cache_cross_10_dq"DequantizeLinear
+z
+k_cache_cross_10_dq
+k_cache_cross_10_scale
+k_cache_cross_10_zpk_cache_cross_10_qk_cache_cross_10_q"QuantizeLinear
+{
+v_cache_cross_10
+v_cache_cross_10_scale
+v_cache_cross_10_zpv_cache_cross_10_dqv_cache_cross_10_dq"DequantizeLinear
+z
+v_cache_cross_10_dq
+v_cache_cross_10_scale
+v_cache_cross_10_zpv_cache_cross_10_qv_cache_cross_10_q"QuantizeLinear
+{
+k_cache_cross_11
+k_cache_cross_11_scale
+k_cache_cross_11_zpk_cache_cross_11_dqk_cache_cross_11_dq"DequantizeLinear
+z
+k_cache_cross_11_dq
+k_cache_cross_11_scale
+k_cache_cross_11_zpk_cache_cross_11_qk_cache_cross_11_q"QuantizeLinear
+{
+v_cache_cross_11
+v_cache_cross_11_scale
+v_cache_cross_11_zpv_cache_cross_11_dqv_cache_cross_11_dq"DequantizeLinear
+z
+v_cache_cross_11_dq
+v_cache_cross_11_scale
+v_cache_cross_11_zpv_cache_cross_11_qv_cache_cross_11_q"QuantizeLinear
+€
+	input_ids
+attention_mask_q
+k_cache_self_0_in_q
+v_cache_self_0_in_q
+k_cache_self_1_in_q
+v_cache_self_1_in_q
+k_cache_self_2_in_q
+v_cache_self_2_in_q
+k_cache_self_3_in_q
+v_cache_self_3_in_q
+k_cache_self_4_in_q
+v_cache_self_4_in_q
+k_cache_self_5_in_q
+v_cache_self_5_in_q
+k_cache_self_6_in_q
+v_cache_self_6_in_q
+k_cache_self_7_in_q
+v_cache_self_7_in_q
+k_cache_self_8_in_q
+v_cache_self_8_in_q
+k_cache_self_9_in_q
+v_cache_self_9_in_q
+k_cache_self_10_in_q
+v_cache_self_10_in_q
+k_cache_self_11_in_q
+v_cache_self_11_in_q
+k_cache_cross_0_q
+v_cache_cross_0_q
+k_cache_cross_1_q
+v_cache_cross_1_q
+k_cache_cross_2_q
+v_cache_cross_2_q
+k_cache_cross_3_q
+v_cache_cross_3_q
+k_cache_cross_4_q
+v_cache_cross_4_q
+k_cache_cross_5_q
+v_cache_cross_5_q
+k_cache_cross_6_q
+v_cache_cross_6_q
+k_cache_cross_7_q
+v_cache_cross_7_q
+k_cache_cross_8_q
+v_cache_cross_8_q
+k_cache_cross_9_q
+v_cache_cross_9_q
+k_cache_cross_10_q
+v_cache_cross_10_q
+k_cache_cross_11_q
+v_cache_cross_11_q
+position_idslogits_qk_cache_self_0_out_qv_cache_self_0_out_qk_cache_self_1_out_qv_cache_self_1_out_qk_cache_self_2_out_qv_cache_self_2_out_qk_cache_self_3_out_qv_cache_self_3_out_qk_cache_self_4_out_qv_cache_self_4_out_qk_cache_self_5_out_qv_cache_self_5_out_qk_cache_self_6_out_qv_cache_self_6_out_qk_cache_self_7_out_qv_cache_self_7_out_qk_cache_self_8_out_qv_cache_self_8_out_qk_cache_self_9_out_qv_cache_self_9_out_qk_cache_self_10_out_qv_cache_self_10_out_qk_cache_self_11_out_qv_cache_self_11_out_q
+QNNContext"	EPContext*
+
+embed_mode  *"
+ep_cache_context"./model.bin *
+source"QNN :com.microsoft
+K
+logits_q
+logits_scale
+	logits_zp	logits_dq	logits_dq"DequantizeLinear
+D
+	logits_dq
+logits_scale
+	logits_zplogitslogits"QuantizeLinear
+‡
+k_cache_self_0_out_q
+k_cache_self_0_out_scale
+k_cache_self_0_out_zpk_cache_self_0_out_dqk_cache_self_0_out_dq"DequantizeLinear
+€
+k_cache_self_0_out_dq
+k_cache_self_0_out_scale
+k_cache_self_0_out_zpk_cache_self_0_outk_cache_self_0_out"QuantizeLinear
+‡
+v_cache_self_0_out_q
+v_cache_self_0_out_scale
+v_cache_self_0_out_zpv_cache_self_0_out_dqv_cache_self_0_out_dq"DequantizeLinear
+€
+v_cache_self_0_out_dq
+v_cache_self_0_out_scale
+v_cache_self_0_out_zpv_cache_self_0_outv_cache_self_0_out"QuantizeLinear
+‡
+k_cache_self_1_out_q
+k_cache_self_1_out_scale
+k_cache_self_1_out_zpk_cache_self_1_out_dqk_cache_self_1_out_dq"DequantizeLinear
+€
+k_cache_self_1_out_dq
+k_cache_self_1_out_scale
+k_cache_self_1_out_zpk_cache_self_1_outk_cache_self_1_out"QuantizeLinear
+‡
+v_cache_self_1_out_q
+v_cache_self_1_out_scale
+v_cache_self_1_out_zpv_cache_self_1_out_dqv_cache_self_1_out_dq"DequantizeLinear
+€
+v_cache_self_1_out_dq
+v_cache_self_1_out_scale
+v_cache_self_1_out_zpv_cache_self_1_outv_cache_self_1_out"QuantizeLinear
+‡
+k_cache_self_2_out_q
+k_cache_self_2_out_scale
+k_cache_self_2_out_zpk_cache_self_2_out_dqk_cache_self_2_out_dq"DequantizeLinear
+€
+k_cache_self_2_out_dq
+k_cache_self_2_out_scale
+k_cache_self_2_out_zpk_cache_self_2_outk_cache_self_2_out"QuantizeLinear
+‡
+v_cache_self_2_out_q
+v_cache_self_2_out_scale
+v_cache_self_2_out_zpv_cache_self_2_out_dqv_cache_self_2_out_dq"DequantizeLinear
+€
+v_cache_self_2_out_dq
+v_cache_self_2_out_scale
+v_cache_self_2_out_zpv_cache_self_2_outv_cache_self_2_out"QuantizeLinear
+‡
+k_cache_self_3_out_q
+k_cache_self_3_out_scale
+k_cache_self_3_out_zpk_cache_self_3_out_dqk_cache_self_3_out_dq"DequantizeLinear
+€
+k_cache_self_3_out_dq
+k_cache_self_3_out_scale
+k_cache_self_3_out_zpk_cache_self_3_outk_cache_self_3_out"QuantizeLinear
+‡
+v_cache_self_3_out_q
+v_cache_self_3_out_scale
+v_cache_self_3_out_zpv_cache_self_3_out_dqv_cache_self_3_out_dq"DequantizeLinear
+€
+v_cache_self_3_out_dq
+v_cache_self_3_out_scale
+v_cache_self_3_out_zpv_cache_self_3_outv_cache_self_3_out"QuantizeLinear
+‡
+k_cache_self_4_out_q
+k_cache_self_4_out_scale
+k_cache_self_4_out_zpk_cache_self_4_out_dqk_cache_self_4_out_dq"DequantizeLinear
+€
+k_cache_self_4_out_dq
+k_cache_self_4_out_scale
+k_cache_self_4_out_zpk_cache_self_4_outk_cache_self_4_out"QuantizeLinear
+‡
+v_cache_self_4_out_q
+v_cache_self_4_out_scale
+v_cache_self_4_out_zpv_cache_self_4_out_dqv_cache_self_4_out_dq"DequantizeLinear
+€
+v_cache_self_4_out_dq
+v_cache_self_4_out_scale
+v_cache_self_4_out_zpv_cache_self_4_outv_cache_self_4_out"QuantizeLinear
+‡
+k_cache_self_5_out_q
+k_cache_self_5_out_scale
+k_cache_self_5_out_zpk_cache_self_5_out_dqk_cache_self_5_out_dq"DequantizeLinear
+€
+k_cache_self_5_out_dq
+k_cache_self_5_out_scale
+k_cache_self_5_out_zpk_cache_self_5_outk_cache_self_5_out"QuantizeLinear
+‡
+v_cache_self_5_out_q
+v_cache_self_5_out_scale
+v_cache_self_5_out_zpv_cache_self_5_out_dqv_cache_self_5_out_dq"DequantizeLinear
+€
+v_cache_self_5_out_dq
+v_cache_self_5_out_scale
+v_cache_self_5_out_zpv_cache_self_5_outv_cache_self_5_out"QuantizeLinear
+‡
+k_cache_self_6_out_q
+k_cache_self_6_out_scale
+k_cache_self_6_out_zpk_cache_self_6_out_dqk_cache_self_6_out_dq"DequantizeLinear
+€
+k_cache_self_6_out_dq
+k_cache_self_6_out_scale
+k_cache_self_6_out_zpk_cache_self_6_outk_cache_self_6_out"QuantizeLinear
+‡
+v_cache_self_6_out_q
+v_cache_self_6_out_scale
+v_cache_self_6_out_zpv_cache_self_6_out_dqv_cache_self_6_out_dq"DequantizeLinear
+€
+v_cache_self_6_out_dq
+v_cache_self_6_out_scale
+v_cache_self_6_out_zpv_cache_self_6_outv_cache_self_6_out"QuantizeLinear
+‡
+k_cache_self_7_out_q
+k_cache_self_7_out_scale
+k_cache_self_7_out_zpk_cache_self_7_out_dqk_cache_self_7_out_dq"DequantizeLinear
+€
+k_cache_self_7_out_dq
+k_cache_self_7_out_scale
+k_cache_self_7_out_zpk_cache_self_7_outk_cache_self_7_out"QuantizeLinear
+‡
+v_cache_self_7_out_q
+v_cache_self_7_out_scale
+v_cache_self_7_out_zpv_cache_self_7_out_dqv_cache_self_7_out_dq"DequantizeLinear
+€
+v_cache_self_7_out_dq
+v_cache_self_7_out_scale
+v_cache_self_7_out_zpv_cache_self_7_outv_cache_self_7_out"QuantizeLinear
+‡
+k_cache_self_8_out_q
+k_cache_self_8_out_scale
+k_cache_self_8_out_zpk_cache_self_8_out_dqk_cache_self_8_out_dq"DequantizeLinear
+€
+k_cache_self_8_out_dq
+k_cache_self_8_out_scale
+k_cache_self_8_out_zpk_cache_self_8_outk_cache_self_8_out"QuantizeLinear
+‡
+v_cache_self_8_out_q
+v_cache_self_8_out_scale
+v_cache_self_8_out_zpv_cache_self_8_out_dqv_cache_self_8_out_dq"DequantizeLinear
+€
+v_cache_self_8_out_dq
+v_cache_self_8_out_scale
+v_cache_self_8_out_zpv_cache_self_8_outv_cache_self_8_out"QuantizeLinear
+‡
+k_cache_self_9_out_q
+k_cache_self_9_out_scale
+k_cache_self_9_out_zpk_cache_self_9_out_dqk_cache_self_9_out_dq"DequantizeLinear
+€
+k_cache_self_9_out_dq
+k_cache_self_9_out_scale
+k_cache_self_9_out_zpk_cache_self_9_outk_cache_self_9_out"QuantizeLinear
+‡
+v_cache_self_9_out_q
+v_cache_self_9_out_scale
+v_cache_self_9_out_zpv_cache_self_9_out_dqv_cache_self_9_out_dq"DequantizeLinear
+€
+v_cache_self_9_out_dq
+v_cache_self_9_out_scale
+v_cache_self_9_out_zpv_cache_self_9_outv_cache_self_9_out"QuantizeLinear
+Œ
+k_cache_self_10_out_q
+k_cache_self_10_out_scale
+k_cache_self_10_out_zpk_cache_self_10_out_dqk_cache_self_10_out_dq"DequantizeLinear
+…
+k_cache_self_10_out_dq
+k_cache_self_10_out_scale
+k_cache_self_10_out_zpk_cache_self_10_outk_cache_self_10_out"QuantizeLinear
+Œ
+v_cache_self_10_out_q
+v_cache_self_10_out_scale
+v_cache_self_10_out_zpv_cache_self_10_out_dqv_cache_self_10_out_dq"DequantizeLinear
+…
+v_cache_self_10_out_dq
+v_cache_self_10_out_scale
+v_cache_self_10_out_zpv_cache_self_10_outv_cache_self_10_out"QuantizeLinear
+Œ
+k_cache_self_11_out_q
+k_cache_self_11_out_scale
+k_cache_self_11_out_zpk_cache_self_11_out_dqk_cache_self_11_out_dq"DequantizeLinear
+…
+k_cache_self_11_out_dq
+k_cache_self_11_out_scale
+k_cache_self_11_out_zpk_cache_self_11_outk_cache_self_11_out"QuantizeLinear
+Œ
+v_cache_self_11_out_q
+v_cache_self_11_out_scale
+v_cache_self_11_out_zpv_cache_self_11_out_dqv_cache_self_11_out_dq"DequantizeLinear
+…
+v_cache_self_11_out_dq
+v_cache_self_11_out_scale
+v_cache_self_11_out_zpv_cache_self_11_outv_cache_self_11_out"QuantizeLinearqnn-onnx-model*"È È:Battention_mask_scale**ÿÿBattention_mask_zp*!"ƒ=Bk_cache_self_0_in_scale**€Bk_cache_self_0_in_zp*!"SÛñ<Bv_cache_self_0_in_scale**€Bv_cache_self_0_in_zp*!"“Ã<Bk_cache_self_1_in_scale**€Bk_cache_self_1_in_zp*!"m8s<Bv_cache_self_1_in_scale**€Bv_cache_self_1_in_zp*!"Ž¾p=Bk_cache_self_2_in_scale**€Bk_cache_self_2_in_zp*!"–¹Ÿ<Bv_cache_self_2_in_scale**€Bv_cache_self_2_in_zp*!"°¤É=Bk_cache_self_3_in_scale**€Bk_cache_self_3_in_zp*!"šS™<Bv_cache_self_3_in_scale**€Bv_cache_self_3_in_zp*!"PŸ‰=Bk_cache_self_4_in_scale**€Bk_cache_self_4_in_zp*!"_uÄ<Bv_cache_self_4_in_scale**€Bv_cache_self_4_in_zp*!"š"t=Bk_cache_self_5_in_scale**€Bk_cache_self_5_in_zp*!"kû<Bv_cache_self_5_in_scale**€Bv_cache_self_5_in_zp*!"„:’=Bk_cache_self_6_in_scale**€Bk_cache_self_6_in_zp*!"ö=Bv_cache_self_6_in_scale**€Bv_cache_self_6_in_zp*!" af=Bk_cache_self_7_in_scale**€Bk_cache_self_7_in_zp*!"y¿=Bv_cache_self_7_in_scale**€Bv_cache_self_7_in_zp*!"©®r=Bk_cache_self_8_in_scale**€Bk_cache_self_8_in_zp*!"`w%=Bv_cache_self_8_in_scale**€Bv_cache_self_8_in_zp*!"3Í^=Bk_cache_self_9_in_scale**€Bk_cache_self_9_in_zp*!"žõ?=Bv_cache_self_9_in_scale**€Bv_cache_self_9_in_zp*""‰¥g=Bk_cache_self_10_in_scale**€Bk_cache_self_10_in_zp*""¡›A=Bv_cache_self_10_in_scale**€Bv_cache_self_10_in_zp*""¯ñb=Bk_cache_self_11_in_scale**€Bk_cache_self_11_in_zp*""EÚI=Bv_cache_self_11_in_scale**€Bv_cache_self_11_in_zp*"°°=Bk_cache_cross_0_scale**€Bk_cache_cross_0_zp*"Ø¾=Bv_cache_cross_0_scale**€Bv_cache_cross_0_zp*"—*·=Bk_cache_cross_1_scale**€Bk_cache_cross_1_zp*"Å6=Bv_cache_cross_1_scale**€Bv_cache_cross_1_zp*"DÈ=Bk_cache_cross_2_scale**€Bk_cache_cross_2_zp*"·ú=Bv_cache_cross_2_scale**€Bv_cache_cross_2_zp*"1l¦=Bk_cache_cross_3_scale**€Bk_cache_cross_3_zp*"Cÿ>Bv_cache_cross_3_scale**€Bv_cache_cross_3_zp*"#Äù=Bk_cache_cross_4_scale**€Bk_cache_cross_4_zp*"Iý>Bv_cache_cross_4_scale**€Bv_cache_cross_4_zp*"Yá=Bk_cache_cross_5_scale**€Bk_cache_cross_5_zp*"ù‡Û=Bv_cache_cross_5_scale**€Bv_cache_cross_5_zp*"!} >Bk_cache_cross_6_scale**€Bk_cache_cross_6_zp*"Öù>Bv_cache_cross_6_scale**€Bv_cache_cross_6_zp*"óÔ=Bk_cache_cross_7_scale**€Bk_cache_cross_7_zp*"ÛäÆ=Bv_cache_cross_7_scale**€Bv_cache_cross_7_zp*"Õ¹®=Bk_cache_cross_8_scale**€Bk_cache_cross_8_zp*"rb=Bv_cache_cross_8_scale**€Bv_cache_cross_8_zp*"·ª©=Bk_cache_cross_9_scale**€Bk_cache_cross_9_zp*"œ¡=Bv_cache_cross_9_scale**€Bv_cache_cross_9_zp* "’û´=Bk_cache_cross_10_scale**€Bk_cache_cross_10_zp* "…Ó=Bv_cache_cross_10_scale**€Bv_cache_cross_10_zp* "D¼Ÿ=Bk_cache_cross_11_scale**€Bk_cache_cross_11_zp* "´ä>Bv_cache_cross_11_scale**€Bv_cache_cross_11_zp*"qj©:Blogits_scale**Ë‹B	logits_zp*""ƒ=Bk_cache_self_0_out_scale**€Bk_cache_self_0_out_zp*""SÛñ<Bv_cache_self_0_out_scale**€Bv_cache_self_0_out_zp*""“Ã<Bk_cache_self_1_out_scale**€Bk_cache_self_1_out_zp*""m8s<Bv_cache_self_1_out_scale**€Bv_cache_self_1_out_zp*""Ž¾p=Bk_cache_self_2_out_scale**€Bk_cache_self_2_out_zp*""–¹Ÿ<Bv_cache_self_2_out_scale**€Bv_cache_self_2_out_zp*""°¤É=Bk_cache_self_3_out_scale**€Bk_cache_self_3_out_zp*""šS™<Bv_cache_self_3_out_scale**€Bv_cache_self_3_out_zp*""PŸ‰=Bk_cache_self_4_out_scale**€Bk_cache_self_4_out_zp*""_uÄ<Bv_cache_self_4_out_scale**€Bv_cache_self_4_out_zp*""š"t=Bk_cache_self_5_out_scale**€Bk_cache_self_5_out_zp*""kû<Bv_cache_self_5_out_scale**€Bv_cache_self_5_out_zp*""„:’=Bk_cache_self_6_out_scale**€Bk_cache_self_6_out_zp*""ö=Bv_cache_self_6_out_scale**€Bv_cache_self_6_out_zp*"" af=Bk_cache_self_7_out_scale**€Bk_cache_self_7_out_zp*""y¿=Bv_cache_self_7_out_scale**€Bv_cache_self_7_out_zp*""©®r=Bk_cache_self_8_out_scale**€Bk_cache_self_8_out_zp*""`w%=Bv_cache_self_8_out_scale**€Bv_cache_self_8_out_zp*""3Í^=Bk_cache_self_9_out_scale**€Bk_cache_self_9_out_zp*""žõ?=Bv_cache_self_9_out_scale**€Bv_cache_self_9_out_zp*#"‰¥g=Bk_cache_self_10_out_scale**€Bk_cache_self_10_out_zp*#"¡›A=Bv_cache_self_10_out_scale**€Bv_cache_self_10_out_zp*#"¯ñb=Bk_cache_self_11_out_scale**€Bk_cache_self_11_out_zp*#"EÚI=Bv_cache_self_11_out_scale**€Bv_cache_self_11_out_zpZ
+	input_ids
+
+
+Z)
+attention_mask
+
+
+
+
+ÈZ,
+k_cache_self_0_in
+
+
+
+@
+ÇZ,
+v_cache_self_0_in
+
+
+
+Ç
+@Z,
+k_cache_self_1_in
+
+
+
+@
+ÇZ,
+v_cache_self_1_in
+
+
+
+Ç
+@Z,
+k_cache_self_2_in
+
+
+
+@
+ÇZ,
+v_cache_self_2_in
+
+
+
+Ç
+@Z,
+k_cache_self_3_in
+
+
+
+@
+ÇZ,
+v_cache_self_3_in
+
+
+
+Ç
+@Z,
+k_cache_self_4_in
+
+
+
+@
+ÇZ,
+v_cache_self_4_in
+
+
+
+Ç
+@Z,
+k_cache_self_5_in
+
+
+
+@
+ÇZ,
+v_cache_self_5_in
+
+
+
+Ç
+@Z,
+k_cache_self_6_in
+
+
+
+@
+ÇZ,
+v_cache_self_6_in
+
+
+
+Ç
+@Z,
+k_cache_self_7_in
+
+
+
+@
+ÇZ,
+v_cache_self_7_in
+
+
+
+Ç
+@Z,
+k_cache_self_8_in
+
+
+
+@
+ÇZ,
+v_cache_self_8_in
+
+
+
+Ç
+@Z,
+k_cache_self_9_in
+
+
+
+@
+ÇZ,
+v_cache_self_9_in
+
+
+
+Ç
+@Z-
+k_cache_self_10_in
+
+
+
+@
+ÇZ-
+v_cache_self_10_in
+
+
+
+Ç
+@Z-
+k_cache_self_11_in
+
+
+
+@
+ÇZ-
+v_cache_self_11_in
+
+
+
+Ç
+@Z*
+k_cache_cross_0
+
+
+
+@
+ÜZ*
+v_cache_cross_0
+
+
+
+Ü
+@Z*
+k_cache_cross_1
+
+
+
+@
+ÜZ*
+v_cache_cross_1
+
+
+
+Ü
+@Z*
+k_cache_cross_2
+
+
+
+@
+ÜZ*
+v_cache_cross_2
+
+
+
+Ü
+@Z*
+k_cache_cross_3
+
+
+
+@
+ÜZ*
+v_cache_cross_3
+
+
+
+Ü
+@Z*
+k_cache_cross_4
+
+
+
+@
+ÜZ*
+v_cache_cross_4
+
+
+
+Ü
+@Z*
+k_cache_cross_5
+
+
+
+@
+ÜZ*
+v_cache_cross_5
+
+
+
+Ü
+@Z*
+k_cache_cross_6
+
+
+
+@
+ÜZ*
+v_cache_cross_6
+
+
+
+Ü
+@Z*
+k_cache_cross_7
+
+
+
+@
+ÜZ*
+v_cache_cross_7
+
+
+
+Ü
+@Z*
+k_cache_cross_8
+
+
+
+@
+ÜZ*
+v_cache_cross_8
+
+
+
+Ü
+@Z*
+k_cache_cross_9
+
+
+
+@
+ÜZ*
+v_cache_cross_9
+
+
+
+Ü
+@Z+
+k_cache_cross_10
+
+
+
+@
+ÜZ+
+v_cache_cross_10
+
+
+
+Ü
+@Z+
+k_cache_cross_11
+
+
+
+@
+ÜZ+
+v_cache_cross_11
+
+
+
+Ü
+@Z
+position_ids
+
+
+b"
+logits
+
+
+™•
+
+b-
+k_cache_self_0_out
+
+
+
+@
+Çb-
+v_cache_self_0_out
+
+
+
+Ç
+@b-
+k_cache_self_1_out
+
+
+
+@
+Çb-
+v_cache_self_1_out
+
+
+
+Ç
+@b-
+k_cache_self_2_out
+
+
+
+@
+Çb-
+v_cache_self_2_out
+
+
+
+Ç
+@b-
+k_cache_self_3_out
+
+
+
+@
+Çb-
+v_cache_self_3_out
+
+
+
+Ç
+@b-
+k_cache_self_4_out
+
+
+
+@
+Çb-
+v_cache_self_4_out
+
+
+
+Ç
+@b-
+k_cache_self_5_out
+
+
+
+@
+Çb-
+v_cache_self_5_out
+
+
+
+Ç
+@b-
+k_cache_self_6_out
+
+
+
+@
+Çb-
+v_cache_self_6_out
+
+
+
+Ç
+@b-
+k_cache_self_7_out
+
+
+
+@
+Çb-
+v_cache_self_7_out
+
+
+
+Ç
+@b-
+k_cache_self_8_out
+
+
+
+@
+Çb-
+v_cache_self_8_out
+
+
+
+Ç
+@b-
+k_cache_self_9_out
+
+
+
+@
+Çb-
+v_cache_self_9_out
+
+
+
+Ç
+@b.
+k_cache_self_10_out
+
+
+
+@
+Çb.
+v_cache_self_10_out
+
+
+
+Ç
+@b.
+k_cache_self_11_out
+
+
+
+@
+Çb.
+v_cache_self_11_out
+
+
+
+Ç
+@j
+	input_ids
+
+
+j,
+attention_mask_dq
+
+
+
+
+Èj+
+attention_mask_q
+
+
+
+
+Èj)
+attention_mask
+
+
+
+
+Èj/
+k_cache_self_0_in_dq
+
+
+
+@
+Çj.
+k_cache_self_0_in_q
+
+
+
+@
+Çj,
+k_cache_self_0_in
+
+
+
+@
+Çj/
+v_cache_self_0_in_dq
+
+
+
+Ç
+@j.
+v_cache_self_0_in_q
+
+
+
+Ç
+@j,
+v_cache_self_0_in
+
+
+
+Ç
+@j/
+k_cache_self_1_in_dq
+
+
+
+@
+Çj.
+k_cache_self_1_in_q
+
+
+
+@
+Çj,
+k_cache_self_1_in
+
+
+
+@
+Çj/
+v_cache_self_1_in_dq
+
+
+
+Ç
+@j.
+v_cache_self_1_in_q
+
+
+
+Ç
+@j,
+v_cache_self_1_in
+
+
+
+Ç
+@j/
+k_cache_self_2_in_dq
+
+
+
+@
+Çj.
+k_cache_self_2_in_q
+
+
+
+@
+Çj,
+k_cache_self_2_in
+
+
+
+@
+Çj/
+v_cache_self_2_in_dq
+
+
+
+Ç
+@j.
+v_cache_self_2_in_q
+
+
+
+Ç
+@j,
+v_cache_self_2_in
+
+
+
+Ç
+@j/
+k_cache_self_3_in_dq
+
+
+
+@
+Çj.
+k_cache_self_3_in_q
+
+
+
+@
+Çj,
+k_cache_self_3_in
+
+
+
+@
+Çj/
+v_cache_self_3_in_dq
+
+
+
+Ç
+@j.
+v_cache_self_3_in_q
+
+
+
+Ç
+@j,
+v_cache_self_3_in
+
+
+
+Ç
+@j/
+k_cache_self_4_in_dq
+
+
+
+@
+Çj.
+k_cache_self_4_in_q
+
+
+
+@
+Çj,
+k_cache_self_4_in
+
+
+
+@
+Çj/
+v_cache_self_4_in_dq
+
+
+
+Ç
+@j.
+v_cache_self_4_in_q
+
+
+
+Ç
+@j,
+v_cache_self_4_in
+
+
+
+Ç
+@j/
+k_cache_self_5_in_dq
+
+
+
+@
+Çj.
+k_cache_self_5_in_q
+
+
+
+@
+Çj,
+k_cache_self_5_in
+
+
+
+@
+Çj/
+v_cache_self_5_in_dq
+
+
+
+Ç
+@j.
+v_cache_self_5_in_q
+
+
+
+Ç
+@j,
+v_cache_self_5_in
+
+
+
+Ç
+@j/
+k_cache_self_6_in_dq
+
+
+
+@
+Çj.
+k_cache_self_6_in_q
+
+
+
+@
+Çj,
+k_cache_self_6_in
+
+
+
+@
+Çj/
+v_cache_self_6_in_dq
+
+
+
+Ç
+@j.
+v_cache_self_6_in_q
+
+
+
+Ç
+@j,
+v_cache_self_6_in
+
+
+
+Ç
+@j/
+k_cache_self_7_in_dq
+
+
+
+@
+Çj.
+k_cache_self_7_in_q
+
+
+
+@
+Çj,
+k_cache_self_7_in
+
+
+
+@
+Çj/
+v_cache_self_7_in_dq
+
+
+
+Ç
+@j.
+v_cache_self_7_in_q
+
+
+
+Ç
+@j,
+v_cache_self_7_in
+
+
+
+Ç
+@j/
+k_cache_self_8_in_dq
+
+
+
+@
+Çj.
+k_cache_self_8_in_q
+
+
+
+@
+Çj,
+k_cache_self_8_in
+
+
+
+@
+Çj/
+v_cache_self_8_in_dq
+
+
+
+Ç
+@j.
+v_cache_self_8_in_q
+
+
+
+Ç
+@j,
+v_cache_self_8_in
+
+
+
+Ç
+@j/
+k_cache_self_9_in_dq
+
+
+
+@
+Çj.
+k_cache_self_9_in_q
+
+
+
+@
+Çj,
+k_cache_self_9_in
+
+
+
+@
+Çj/
+v_cache_self_9_in_dq
+
+
+
+Ç
+@j.
+v_cache_self_9_in_q
+
+
+
+Ç
+@j,
+v_cache_self_9_in
+
+
+
+Ç
+@j0
+k_cache_self_10_in_dq
+
+
+
+@
+Çj/
+k_cache_self_10_in_q
+
+
+
+@
+Çj-
+k_cache_self_10_in
+
+
+
+@
+Çj0
+v_cache_self_10_in_dq
+
+
+
+Ç
+@j/
+v_cache_self_10_in_q
+
+
+
+Ç
+@j-
+v_cache_self_10_in
+
+
+
+Ç
+@j0
+k_cache_self_11_in_dq
+
+
+
+@
+Çj/
+k_cache_self_11_in_q
+
+
+
+@
+Çj-
+k_cache_self_11_in
+
+
+
+@
+Çj0
+v_cache_self_11_in_dq
+
+
+
+Ç
+@j/
+v_cache_self_11_in_q
+
+
+
+Ç
+@j-
+v_cache_self_11_in
+
+
+
+Ç
+@j-
+k_cache_cross_0_dq
+
+
+
+@
+Üj,
+k_cache_cross_0_q
+
+
+
+@
+Üj*
+k_cache_cross_0
+
+
+
+@
+Üj-
+v_cache_cross_0_dq
+
+
+
+Ü
+@j,
+v_cache_cross_0_q
+
+
+
+Ü
+@j*
+v_cache_cross_0
+
+
+
+Ü
+@j-
+k_cache_cross_1_dq
+
+
+
+@
+Üj,
+k_cache_cross_1_q
+
+
+
+@
+Üj*
+k_cache_cross_1
+
+
+
+@
+Üj-
+v_cache_cross_1_dq
+
+
+
+Ü
+@j,
+v_cache_cross_1_q
+
+
+
+Ü
+@j*
+v_cache_cross_1
+
+
+
+Ü
+@j-
+k_cache_cross_2_dq
+
+
+
+@
+Üj,
+k_cache_cross_2_q
+
+
+
+@
+Üj*
+k_cache_cross_2
+
+
+
+@
+Üj-
+v_cache_cross_2_dq
+
+
+
+Ü
+@j,
+v_cache_cross_2_q
+
+
+
+Ü
+@j*
+v_cache_cross_2
+
+
+
+Ü
+@j-
+k_cache_cross_3_dq
+
+
+
+@
+Üj,
+k_cache_cross_3_q
+
+
+
+@
+Üj*
+k_cache_cross_3
+
+
+
+@
+Üj-
+v_cache_cross_3_dq
+
+
+
+Ü
+@j,
+v_cache_cross_3_q
+
+
+
+Ü
+@j*
+v_cache_cross_3
+
+
+
+Ü
+@j-
+k_cache_cross_4_dq
+
+
+
+@
+Üj,
+k_cache_cross_4_q
+
+
+
+@
+Üj*
+k_cache_cross_4
+
+
+
+@
+Üj-
+v_cache_cross_4_dq
+
+
+
+Ü
+@j,
+v_cache_cross_4_q
+
+
+
+Ü
+@j*
+v_cache_cross_4
+
+
+
+Ü
+@j-
+k_cache_cross_5_dq
+
+
+
+@
+Üj,
+k_cache_cross_5_q
+
+
+
+@
+Üj*
+k_cache_cross_5
+
+
+
+@
+Üj-
+v_cache_cross_5_dq
+
+
+
+Ü
+@j,
+v_cache_cross_5_q
+
+
+
+Ü
+@j*
+v_cache_cross_5
+
+
+
+Ü
+@j-
+k_cache_cross_6_dq
+
+
+
+@
+Üj,
+k_cache_cross_6_q
+
+
+
+@
+Üj*
+k_cache_cross_6
+
+
+
+@
+Üj-
+v_cache_cross_6_dq
+
+
+
+Ü
+@j,
+v_cache_cross_6_q
+
+
+
+Ü
+@j*
+v_cache_cross_6
+
+
+
+Ü
+@j-
+k_cache_cross_7_dq
+
+
+
+@
+Üj,
+k_cache_cross_7_q
+
+
+
+@
+Üj*
+k_cache_cross_7
+
+
+
+@
+Üj-
+v_cache_cross_7_dq
+
+
+
+Ü
+@j,
+v_cache_cross_7_q
+
+
+
+Ü
+@j*
+v_cache_cross_7
+
+
+
+Ü
+@j-
+k_cache_cross_8_dq
+
+
+
+@
+Üj,
+k_cache_cross_8_q
+
+
+
+@
+Üj*
+k_cache_cross_8
+
+
+
+@
+Üj-
+v_cache_cross_8_dq
+
+
+
+Ü
+@j,
+v_cache_cross_8_q
+
+
+
+Ü
+@j*
+v_cache_cross_8
+
+
+
+Ü
+@j-
+k_cache_cross_9_dq
+
+
+
+@
+Üj,
+k_cache_cross_9_q
+
+
+
+@
+Üj*
+k_cache_cross_9
+
+
+
+@
+Üj-
+v_cache_cross_9_dq
+
+
+
+Ü
+@j,
+v_cache_cross_9_q
+
+
+
+Ü
+@j*
+v_cache_cross_9
+
+
+
+Ü
+@j.
+k_cache_cross_10_dq
+
+
+
+@
+Üj-
+k_cache_cross_10_q
+
+
+
+@
+Üj+
+k_cache_cross_10
+
+
+
+@
+Üj.
+v_cache_cross_10_dq
+
+
+
+Ü
+@j-
+v_cache_cross_10_q
+
+
+
+Ü
+@j+
+v_cache_cross_10
+
+
+
+Ü
+@j.
+k_cache_cross_11_dq
+
+
+
+@
+Üj-
+k_cache_cross_11_q
+
+
+
+@
+Üj+
+k_cache_cross_11
+
+
+
+@
+Üj.
+v_cache_cross_11_dq
+
+
+
+Ü
+@j-
+v_cache_cross_11_q
+
+
+
+Ü
+@j+
+v_cache_cross_11
+
+
+
+Ü
+@j
+position_ids
+
+
+j%
+	logits_dq
+
+
+™•
+
+j$
+logits_q
+
+
+™•
+
+j"
+logits
+
+
+™•
+
+j0
+k_cache_self_0_out_dq
+
+
+
+@
+Çj/
+k_cache_self_0_out_q
+
+
+
+@
+Çj-
+k_cache_self_0_out
+
+
+
+@
+Çj0
+v_cache_self_0_out_dq
+
+
+
+Ç
+@j/
+v_cache_self_0_out_q
+
+
+
+Ç
+@j-
+v_cache_self_0_out
+
+
+
+Ç
+@j0
+k_cache_self_1_out_dq
+
+
+
+@
+Çj/
+k_cache_self_1_out_q
+
+
+
+@
+Çj-
+k_cache_self_1_out
+
+
+
+@
+Çj0
+v_cache_self_1_out_dq
+
+
+
+Ç
+@j/
+v_cache_self_1_out_q
+
+
+
+Ç
+@j-
+v_cache_self_1_out
+
+
+
+Ç
+@j0
+k_cache_self_2_out_dq
+
+
+
+@
+Çj/
+k_cache_self_2_out_q
+
+
+
+@
+Çj-
+k_cache_self_2_out
+
+
+
+@
+Çj0
+v_cache_self_2_out_dq
+
+
+
+Ç
+@j/
+v_cache_self_2_out_q
+
+
+
+Ç
+@j-
+v_cache_self_2_out
+
+
+
+Ç
+@j0
+k_cache_self_3_out_dq
+
+
+
+@
+Çj/
+k_cache_self_3_out_q
+
+
+
+@
+Çj-
+k_cache_self_3_out
+
+
+
+@
+Çj0
+v_cache_self_3_out_dq
+
+
+
+Ç
+@j/
+v_cache_self_3_out_q
+
+
+
+Ç
+@j-
+v_cache_self_3_out
+
+
+
+Ç
+@j0
+k_cache_self_4_out_dq
+
+
+
+@
+Çj/
+k_cache_self_4_out_q
+
+
+
+@
+Çj-
+k_cache_self_4_out
+
+
+
+@
+Çj0
+v_cache_self_4_out_dq
+
+
+
+Ç
+@j/
+v_cache_self_4_out_q
+
+
+
+Ç
+@j-
+v_cache_self_4_out
+
+
+
+Ç
+@j0
+k_cache_self_5_out_dq
+
+
+
+@
+Çj/
+k_cache_self_5_out_q
+
+
+
+@
+Çj-
+k_cache_self_5_out
+
+
+
+@
+Çj0
+v_cache_self_5_out_dq
+
+
+
+Ç
+@j/
+v_cache_self_5_out_q
+
+
+
+Ç
+@j-
+v_cache_self_5_out
+
+
+
+Ç
+@j0
+k_cache_self_6_out_dq
+
+
+
+@
+Çj/
+k_cache_self_6_out_q
+
+
+
+@
+Çj-
+k_cache_self_6_out
+
+
+
+@
+Çj0
+v_cache_self_6_out_dq
+
+
+
+Ç
+@j/
+v_cache_self_6_out_q
+
+
+
+Ç
+@j-
+v_cache_self_6_out
+
+
+
+Ç
+@j0
+k_cache_self_7_out_dq
+
+
+
+@
+Çj/
+k_cache_self_7_out_q
+
+
+
+@
+Çj-
+k_cache_self_7_out
+
+
+
+@
+Çj0
+v_cache_self_7_out_dq
+
+
+
+Ç
+@j/
+v_cache_self_7_out_q
+
+
+
+Ç
+@j-
+v_cache_self_7_out
+
+
+
+Ç
+@j0
+k_cache_self_8_out_dq
+
+
+
+@
+Çj/
+k_cache_self_8_out_q
+
+
+
+@
+Çj-
+k_cache_self_8_out
+
+
+
+@
+Çj0
+v_cache_self_8_out_dq
+
+
+
+Ç
+@j/
+v_cache_self_8_out_q
+
+
+
+Ç
+@j-
+v_cache_self_8_out
+
+
+
+Ç
+@j0
+k_cache_self_9_out_dq
+
+
+
+@
+Çj/
+k_cache_self_9_out_q
+
+
+
+@
+Çj-
+k_cache_self_9_out
+
+
+
+@
+Çj0
+v_cache_self_9_out_dq
+
+
+
+Ç
+@j/
+v_cache_self_9_out_q
+
+
+
+Ç
+@j-
+v_cache_self_9_out
+
+
+
+Ç
+@j1
+k_cache_self_10_out_dq
+
+
+
+@
+Çj0
+k_cache_self_10_out_q
+
+
+
+@
+Çj.
+k_cache_self_10_out
+
+
+
+@
+Çj1
+v_cache_self_10_out_dq
+
+
+
+Ç
+@j0
+v_cache_self_10_out_q
+
+
+
+Ç
+@j.
+v_cache_self_10_out
+
+
+
+Ç
+@j1
+k_cache_self_11_out_dq
+
+
+
+@
+Çj0
+k_cache_self_11_out_q
+
+
+
+@
+Çj.
+k_cache_self_11_out
+
+
+
+@
+Çj1
+v_cache_self_11_out_dq
+
+
+
+Ç
+@j0
+v_cache_self_11_out_q
+
+
+
+Ç
+@j.
+v_cache_self_11_out
+
+
+
+Ç
+@B
