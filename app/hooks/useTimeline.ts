@@ -209,6 +209,7 @@ export const useTimeline = () => {
           left_transition_id: scrubber.left_transition_id,
           right_transition_id: scrubber.right_transition_id,
           groupped_scrubbers: scrubber.groupped_scrubbers,
+          playbackRate: scrubber.playbackRate,
         });
       }
     }
@@ -761,6 +762,12 @@ export const useTimeline = () => {
         // for video scrubbers (and audio in the future)
         trimBefore: null,
         trimAfter: null,
+        playbackRate:
+          item.mediaType === "video" || item.mediaType === "audio"
+            ? Number.isFinite(item.playbackRate) && Number(item.playbackRate) > 0
+              ? Number(item.playbackRate)
+              : 1
+            : undefined,
 
         left_transition_id: null,
         right_transition_id: null,
@@ -2191,6 +2198,7 @@ export const useTimeline = () => {
         is_dragging: id.is_dragging,
         trimBefore: id.trimBefore,
         trimAfter: id.trimAfter,
+        playbackRate: id.playbackRate,
       }));
 
       // Replace grouped scrubber with individual scrubbers

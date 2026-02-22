@@ -16,6 +16,7 @@ export interface BaseScrubber {
   // for a middle transition, you will only see its information in the left scrubber.
   left_transition_id: string | null; // only use this for the first scrubber intro
   right_transition_id: string | null; // this is what you use everywhere
+  playbackRate?: number; // used for video/audio playback speed; defaults to 1
 }
 
 export interface Transition {

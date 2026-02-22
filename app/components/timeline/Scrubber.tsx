@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { DEFAULT_TRACK_HEIGHT, type ScrubberState, type Transition } from "./types";
+import { DEFAULT_TRACK_HEIGHT, FPS, type ScrubberState } from "./types";
 import { Trash2, Group, Ungroup, Archive } from "lucide-react";
 
 // something something for the css not gonna bother with it for now
@@ -27,6 +27,8 @@ export interface ScrubberProps {
   selectedScrubberIds: string[];
   onBeginTransform?: () => void; // drag or resize start snapshot
 }
+
+const SPEED_PRESETS = [1, 1.25, 1.5, 2];
 
 export const Scrubber: React.FC<ScrubberProps> = ({
   scrubber,
@@ -63,6 +65,72 @@ export const Scrubber: React.FC<ScrubberProps> = ({
   }>({ visible: false, x: 0, y: 0 });
 
   const MINIMUM_WIDTH = 20;
+  const normalizePlaybackRate = useCallback((value: number | null | undefined) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) return 1;
+    return Math.min(4, Math.max(0.1, parsed));
+  }, []);
+
+  const getOriginalDurationFrames = useCallback(() => {
+    if (!Number.isFinite(scrubber.durationInSeconds) || scrubber.durationInSeconds <= 0) {
+      return null;
+    }
+    return Math.max(1, Math.round(scrubber.durationInSeconds * FPS));
+  }, [scrubber.durationInSeconds]);
+
+  const applyPlaybackRate = useCallback(
+    (nextRateRaw: number) => {
+      if (scrubber.mediaType !== "video" && scrubber.mediaType !== "audio") {
+        return;
+      }
+      const originalDurationFrames = getOriginalDurationFrames();
+      if (!originalDurationFrames) {
+        return;
+      }
+
+      const trimBefore = Math.max(0, Math.round(scrubber.trimBefore || 0));
+      const trimAfter = Math.max(0, Math.round(scrubber.trimAfter || 0));
+      const maxSourceFrames = Math.max(1, originalDurationFrames - trimBefore);
+      const sourceFrames = Math.max(
+        1,
+        Math.min(maxSourceFrames, originalDurationFrames - trimBefore - trimAfter)
+      );
+      const nextRate = normalizePlaybackRate(nextRateRaw);
+      const maxTimelineWidth = Math.max(1, timelineWidth - scrubber.left);
+      const requestedWidth = (sourceFrames / nextRate / FPS) * pixelsPerSecond;
+      const boundedWidth = Math.max(1, Math.min(maxTimelineWidth, requestedWidth));
+
+      const normalizedSourceFrames = Math.max(
+        1,
+        Math.min(
+          maxSourceFrames,
+          Math.round((boundedWidth / pixelsPerSecond) * FPS * nextRate)
+        )
+      );
+      const normalizedTrimAfter = Math.max(
+        0,
+        originalDurationFrames - trimBefore - normalizedSourceFrames
+      );
+      const normalizedWidth =
+        (normalizedSourceFrames / nextRate / FPS) * pixelsPerSecond;
+
+      onUpdate({
+        ...scrubber,
+        playbackRate: nextRate,
+        width: normalizedWidth,
+        trimBefore,
+        trimAfter: normalizedTrimAfter,
+      });
+    },
+    [
+      getOriginalDurationFrames,
+      normalizePlaybackRate,
+      onUpdate,
+      pixelsPerSecond,
+      scrubber,
+      timelineWidth,
+    ]
+  );
 
   // Get snap points (scrubber edges and grid marks)
   const getSnapPoints = useCallback(
@@ -117,8 +185,11 @@ export const Scrubber: React.FC<ScrubberProps> = ({
         onSelect(scrubber.id, e.ctrlKey);
       }
 
-      // Prevent resizing for video and audio media
-      if ((mode === "resize-left" || mode === "resize-right") && (scrubber.mediaType === "video" || scrubber.mediaType === "audio")) {
+      // Grouped clips cannot be resized directly.
+      if (
+        (mode === "resize-left" || mode === "resize-right") &&
+        scrubber.mediaType === "groupped_scrubber"
+      ) {
         return;
       }
 
@@ -181,10 +252,72 @@ export const Scrubber: React.FC<ScrubberProps> = ({
         }
       } else if (isResizing) {
         const deltaX = e.clientX - dragStateRef.current.startX;
+        const isTimedMedia =
+          scrubber.mediaType === "video" || scrubber.mediaType === "audio";
+        const originalDurationFrames = isTimedMedia
+          ? getOriginalDurationFrames()
+          : null;
+        const playbackRate = normalizePlaybackRate(scrubber.playbackRate);
 
         if (resizeMode === "left") {
           let newLeft = dragStateRef.current.startLeft + deltaX;
           let newWidth = dragStateRef.current.startWidth - deltaX;
+
+          if (isTimedMedia && originalDurationFrames) {
+            const startRight =
+              dragStateRef.current.startLeft + dragStateRef.current.startWidth;
+            const trimAfter = Math.max(0, Math.round(scrubber.trimAfter || 0));
+            const maxSourceFrames = Math.max(1, originalDurationFrames - trimAfter);
+            const maxWidthBySource =
+              (maxSourceFrames / playbackRate / FPS) * pixelsPerSecond;
+            const minWidth = Math.max(1, Math.min(MINIMUM_WIDTH, maxWidthBySource));
+
+            newLeft = Math.max(0, newLeft);
+            newLeft = findSnapPoint(newLeft, scrubber.id);
+            newWidth = startRight - newLeft;
+            newWidth = Math.max(minWidth, Math.min(newWidth, maxWidthBySource));
+
+            let sourceFrames = Math.max(
+              1,
+              Math.min(
+                maxSourceFrames,
+                Math.round((newWidth / pixelsPerSecond) * FPS * playbackRate)
+              )
+            );
+            let normalizedWidth =
+              (sourceFrames / playbackRate / FPS) * pixelsPerSecond;
+            let normalizedLeft = startRight - normalizedWidth;
+
+            if (normalizedLeft < 0) {
+              normalizedLeft = 0;
+              sourceFrames = Math.max(
+                1,
+                Math.min(
+                  maxSourceFrames,
+                  Math.round(
+                    (startRight / pixelsPerSecond) * FPS * playbackRate
+                  )
+                )
+              );
+              normalizedWidth =
+                (sourceFrames / playbackRate / FPS) * pixelsPerSecond;
+              normalizedLeft = Math.max(0, startRight - normalizedWidth);
+            }
+
+            const trimBefore = Math.max(
+              0,
+              originalDurationFrames - trimAfter - sourceFrames
+            );
+            const newScrubber = {
+              ...scrubber,
+              left: normalizedLeft,
+              width: normalizedWidth,
+              trimBefore,
+              trimAfter,
+            };
+            onUpdate(newScrubber);
+            return;
+          }
 
           if (scrubber.width === MINIMUM_WIDTH && deltaX > 0) {
             return;
@@ -192,52 +325,107 @@ export const Scrubber: React.FC<ScrubberProps> = ({
 
           newLeft = Math.max(0, newLeft);
           newWidth = Math.max(MINIMUM_WIDTH, newWidth);
-
-          // Apply snapping to left edge
           newLeft = findSnapPoint(newLeft, scrubber.id);
-          newWidth =
-            dragStateRef.current.startLeft +
-            dragStateRef.current.startWidth -
-            newLeft;
-
+          newWidth = dragStateRef.current.startLeft + dragStateRef.current.startWidth - newLeft;
           if (newLeft === 0) {
-            newWidth =
-              dragStateRef.current.startLeft +
-              dragStateRef.current.startWidth;
+            newWidth = dragStateRef.current.startLeft + dragStateRef.current.startWidth;
           }
-
-          if (newLeft + newWidth > timelineWidth) {
-            newWidth = timelineWidth - newLeft;
-          }
+          if (newLeft + newWidth > timelineWidth) newWidth = timelineWidth - newLeft;
 
           const newScrubber = { ...scrubber, left: newLeft, width: newWidth };
           onUpdate(newScrubber);
         } else if (resizeMode === "right") {
           let newWidth = dragStateRef.current.startWidth + deltaX;
 
-          newWidth = Math.max(MINIMUM_WIDTH, newWidth);
+          if (isTimedMedia && originalDurationFrames) {
+            const trimBefore = Math.max(0, Math.round(scrubber.trimBefore || 0));
+            const maxSourceFrames = Math.max(1, originalDurationFrames - trimBefore);
+            const maxWidthBySource =
+              (maxSourceFrames / playbackRate / FPS) * pixelsPerSecond;
+            const minWidth = Math.max(1, Math.min(MINIMUM_WIDTH, maxWidthBySource));
 
-          // Apply snapping to right edge
+            newWidth = Math.max(minWidth, Math.min(maxWidthBySource, newWidth));
+            let rightEdge = dragStateRef.current.startLeft + newWidth;
+            rightEdge = findSnapPoint(rightEdge, scrubber.id);
+            newWidth = rightEdge - dragStateRef.current.startLeft;
+            newWidth = Math.max(minWidth, Math.min(maxWidthBySource, newWidth));
+
+            if (dragStateRef.current.startLeft + newWidth > timelineWidth) {
+              if (expandTimeline()) {
+                const expandedRightEdge = findSnapPoint(
+                  dragStateRef.current.startLeft +
+                    dragStateRef.current.startWidth +
+                    deltaX,
+                  scrubber.id
+                );
+                newWidth = expandedRightEdge - dragStateRef.current.startLeft;
+                newWidth = Math.max(minWidth, Math.min(maxWidthBySource, newWidth));
+              } else {
+                newWidth = timelineWidth - dragStateRef.current.startLeft;
+              }
+            }
+
+            let sourceFrames = Math.max(
+              1,
+              Math.min(
+                maxSourceFrames,
+                Math.round((newWidth / pixelsPerSecond) * FPS * playbackRate)
+              )
+            );
+            const maxWidthByTimeline = Math.max(
+              1,
+              timelineWidth - dragStateRef.current.startLeft
+            );
+            let normalizedWidth =
+              (sourceFrames / playbackRate / FPS) * pixelsPerSecond;
+            if (normalizedWidth > maxWidthByTimeline) {
+              sourceFrames = Math.max(
+                1,
+                Math.min(
+                  maxSourceFrames,
+                  Math.round(
+                    (maxWidthByTimeline / pixelsPerSecond) * FPS * playbackRate
+                  )
+                )
+              );
+              normalizedWidth =
+                (sourceFrames / playbackRate / FPS) * pixelsPerSecond;
+            }
+            const trimAfter = Math.max(
+              0,
+              originalDurationFrames - trimBefore - sourceFrames
+            );
+
+            const newScrubber = {
+              ...scrubber,
+              width: normalizedWidth,
+              trimBefore,
+              trimAfter,
+            };
+            onUpdate(newScrubber);
+            return;
+          }
+
+          newWidth = Math.max(MINIMUM_WIDTH, newWidth);
           const rightEdge = dragStateRef.current.startLeft + newWidth;
           const snappedRightEdge = findSnapPoint(rightEdge, scrubber.id);
           newWidth = snappedRightEdge - dragStateRef.current.startLeft;
 
           if (dragStateRef.current.startLeft + newWidth > timelineWidth) {
             if (expandTimeline()) {
-              // Recalculate after expansion
-              const rightEdge =
+              const expandedRightEdge = findSnapPoint(
                 dragStateRef.current.startLeft +
-                dragStateRef.current.startWidth +
-                deltaX;
-              const snappedRightEdge = findSnapPoint(rightEdge, scrubber.id);
-              newWidth = snappedRightEdge - dragStateRef.current.startLeft;
+                  dragStateRef.current.startWidth +
+                  deltaX,
+                scrubber.id
+              );
+              newWidth = expandedRightEdge - dragStateRef.current.startLeft;
             } else {
               newWidth = timelineWidth - dragStateRef.current.startLeft;
             }
           }
 
-          const newScrubber = { ...scrubber, width: newWidth };
-          onUpdate(newScrubber);
+          onUpdate({ ...scrubber, width: newWidth });
         }
       }
     },
@@ -247,11 +435,14 @@ export const Scrubber: React.FC<ScrubberProps> = ({
       resizeMode,
       scrubber,
       timelineWidth,
+      getOriginalDurationFrames,
+      normalizePlaybackRate,
       onUpdate,
       expandTimeline,
       containerRef,
       findSnapPoint,
       trackCount,
+      pixelsPerSecond,
     ]
   );
 
@@ -402,6 +593,18 @@ export const Scrubber: React.FC<ScrubberProps> = ({
     setContextMenu({ visible: false, x: 0, y: 0 });
   }, [onMoveToMediaBin, scrubber.id]);
 
+  const handleContextMenuSetSpeed = useCallback(
+    (e: React.MouseEvent, speed: number) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (onBeginTransform) onBeginTransform();
+      applyPlaybackRate(speed);
+      setContextMenu({ visible: false, x: 0, y: 0 });
+    },
+    [applyPlaybackRate, onBeginTransform]
+  );
+
   // Add click outside listener for context menu
   useEffect(() => {
     if (contextMenu.visible) {
@@ -442,23 +645,35 @@ export const Scrubber: React.FC<ScrubberProps> = ({
         {/* Media name */}
         <div className="absolute top-0.5 left-6 right-6 text-xs truncate opacity-90 pointer-events-none">
           {scrubber.name}
+          {(scrubber.mediaType === "video" || scrubber.mediaType === "audio") &&
+          Math.abs(normalizePlaybackRate(scrubber.playbackRate) - 1) > 0.01
+            ? ` (${normalizePlaybackRate(scrubber.playbackRate).toFixed(2)}x)`
+            : ""}
         </div>
 
         {/* Left resize handle - more visible */}
-        {scrubber.mediaType !== "video" && scrubber.mediaType !== "audio" && scrubber.mediaType !== "groupped_scrubber" && (
+        {scrubber.mediaType !== "groupped_scrubber" && (
           <div
             className="absolute top-0 left-0 h-full w-2 cursor-ew-resize z-20 hover:bg-white/30 transition-colors border-r border-white/20 group-hover:bg-white/10"
             onMouseDown={(e) => handleMouseDown(e, "resize-left")}
-            title="Resize left edge"
+            title={
+              scrubber.mediaType === "video" || scrubber.mediaType === "audio"
+                ? "Trim left edge"
+                : "Resize left edge"
+            }
           />
         )}
 
         {/* Right resize handle - more visible */}
-        {scrubber.mediaType !== "video" && scrubber.mediaType !== "audio" && scrubber.mediaType !== "groupped_scrubber" && (
+        {scrubber.mediaType !== "groupped_scrubber" && (
           <div
             className="absolute top-0 right-0 h-full w-2 cursor-ew-resize z-20 hover:bg-white/30 transition-colors border-l border-white/20 group-hover:bg-white/10"
             onMouseDown={(e) => handleMouseDown(e, "resize-right")}
-            title="Resize right edge"
+            title={
+              scrubber.mediaType === "video" || scrubber.mediaType === "audio"
+                ? "Trim right edge"
+                : "Resize right edge"
+            }
           />
         )}
 
@@ -534,6 +749,29 @@ export const Scrubber: React.FC<ScrubberProps> = ({
               <Archive className="h-3 w-3" />
               Move to Media Bin
             </button>
+          )}
+
+          {(scrubber.mediaType === "video" || scrubber.mediaType === "audio") && (
+            <>
+              <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                Playback speed
+              </div>
+              {SPEED_PRESETS.map((speed) => {
+                const normalizedSpeed = normalizePlaybackRate(scrubber.playbackRate);
+                const isCurrent = Math.abs(normalizedSpeed - speed) < 0.01;
+                return (
+                  <button
+                    key={`speed-${speed}`}
+                    className={`flex items-center gap-2 w-full px-3 py-2 text-xs transition-colors text-left hover:bg-muted ${isCurrent ? "font-semibold text-foreground" : "text-muted-foreground"
+                      }`}
+                    onClick={(e) => handleContextMenuSetSpeed(e, speed)}
+                  >
+                    {isCurrent ? "✓ " : ""}
+                    {speed.toFixed(speed % 1 === 0 ? 0 : 2)}x
+                  </button>
+                );
+              })}
+            </>
           )}
 
           <button

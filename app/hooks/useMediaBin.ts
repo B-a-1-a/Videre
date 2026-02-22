@@ -231,6 +231,7 @@ export const useMediaBin = (
         left_transition_id: null,
         right_transition_id: null,
         groupped_scrubbers: null,
+        playbackRate: mediaType === "video" || mediaType === "audio" ? 1 : undefined,
       };
       setMediaBinItems(prev => [...prev, newItem]);
 
@@ -321,6 +322,7 @@ export const useMediaBin = (
       left_transition_id: null,
       right_transition_id: null,
       groupped_scrubbers: null,
+      playbackRate: undefined,
     };
     setMediaBinItems(prev => [...prev, newItem]);
   }, []);
@@ -419,6 +421,7 @@ export const useMediaBin = (
         left_transition_id: null,
         right_transition_id: null,
         groupped_scrubbers: null,
+        playbackRate: 1,
       };
 
       // Add the audio item to the media bin
@@ -487,6 +490,7 @@ export const useMediaBin = (
       left_transition_id: null,
       right_transition_id: null,
       groupped_scrubbers: groupedScrubber.groupped_scrubbers,
+      playbackRate: undefined,
     };
 
     setMediaBinItems(prev => [...prev, newItem]);

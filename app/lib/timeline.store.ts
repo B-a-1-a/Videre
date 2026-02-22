@@ -133,6 +133,7 @@ function toDiskMediaItems(projectId: string): MediaBinItem[] {
       left_transition_id: null,
       right_transition_id: null,
       groupped_scrubbers: null,
+      playbackRate: 1,
     });
   }
   return discovered;

@@ -70,7 +70,9 @@ const DynamicText = ({
     const scrubberDuration =
       "duration" in scrubber && Number.isFinite(scrubber.duration)
         ? scrubber.duration
-        : scrubber.width / resolvedPixelsPerSecond;
+        : "width" in scrubber && Number.isFinite(scrubber.width)
+          ? scrubber.width / resolvedPixelsPerSecond
+          : 0;
     const maxWordEnd = words.reduce(
       (maxValue, word) =>
         Number.isFinite(word.end) ? Math.max(maxValue, word.end) : maxValue,
@@ -176,6 +178,10 @@ export function TimelineComposition({
   // Helper function to create media content
   const createMediaContent = (scrubber: TimelineDataItem['scrubbers'][0] | ScrubberState): React.ReactNode => {
     let content: React.ReactNode = null;
+    const playbackRate =
+      Number.isFinite(scrubber.playbackRate) && Number(scrubber.playbackRate) > 0
+        ? Number(scrubber.playbackRate)
+        : 1;
     const trackOffsetX =
       "trackOffsetX" in scrubber && Number.isFinite(scrubber.trackOffsetX)
         ? Number(scrubber.trackOffsetX)
@@ -246,6 +252,7 @@ export function TimelineComposition({
               src={videoUrl}
               trimBefore={scrubber.trimBefore || undefined}
               trimAfter={scrubber.trimAfter || undefined}
+              playbackRate={playbackRate}
             />
           </AbsoluteFill>
         );
@@ -264,6 +271,7 @@ export function TimelineComposition({
             src={audioUrl}
             trimBefore={scrubber.trimBefore || undefined}
             trimAfter={scrubber.trimAfter || undefined}
+            playbackRate={playbackRate}
           />
         );
         break;
