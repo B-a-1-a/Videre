@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
@@ -18,6 +18,11 @@ import {
   Clapperboard,
   Sun,
   Moon,
+  Upload,
+  RefreshCw,
+  CheckCircle,
+  Image as ImageIcon,
+  X,
 } from "lucide-react";
 import { VidereLogo } from "~/components/ui/VidereLogo";
 import {
@@ -42,6 +47,10 @@ import {
 } from "~/components/ui/alert-dialog";
 import { Input } from "~/components/ui/input";
 import { cn } from "~/lib/utils";
+import { Separator } from "~/components/ui/separator";
+import { Badge } from "~/components/ui/badge";
+
+const API_BASE = "http://localhost:8000";
 
 type Project = { id: string; name: string; created_at: string };
 
@@ -382,6 +391,9 @@ export default function Projects() {
             formatTime={formatTime}
           />
         )}
+
+        {/* ---- Your Media Assets Section ---- */}
+        <MediaAssetsSection />
       </main>
       {/* Create Project Modal */}
       <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title="Create new project">
@@ -480,6 +492,150 @@ export default function Projects() {
           </ADFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// ---- Media Assets Section Component ----
+function MediaAssetsSection() {
+  const [assets, setAssets] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isRebuilding, setIsRebuilding] = useState(false);
+  const [rebuildStatus, setRebuildStatus] = useState<'idle' | 'building' | 'ready' | 'error'>('idle');
+  const [rebuildMessage, setRebuildMessage] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadAssets = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/list-assets`);
+      if (res.ok) {
+        const data = await res.json();
+        setAssets(data.assets || []);
+      }
+    } catch {
+      console.warn('Failed to load assets');
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAssets();
+  }, [loadAssets]);
+
+  const handleUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    setRebuildStatus('idle');
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach((f) => formData.append('files', f));
+
+      const res = await fetch(`${API_BASE}/upload-asset`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Upload failed');
+
+      await loadAssets();
+
+      // Auto-trigger embedding rebuild
+      setRebuildStatus('building');
+      setRebuildMessage('Building AI embeddings for your new assets...');
+      setIsRebuilding(true);
+
+      const rebuildRes = await fetch(`${API_BASE}/rebuild-embeddings`, { method: 'POST' });
+      if (rebuildRes.ok) {
+        const data = await rebuildRes.json();
+        setRebuildStatus('ready');
+        setRebuildMessage('Your assets are ready to be used! 🎉');
+      } else {
+        setRebuildStatus('error');
+        setRebuildMessage('Failed to build embeddings. Try again.');
+      }
+    } catch (err) {
+      setRebuildStatus('error');
+      setRebuildMessage('Upload or embedding build failed.');
+    } finally {
+      setIsUploading(false);
+      setIsRebuilding(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, [loadAssets]);
+
+  const isMedia = (f: string) => {
+    const ext = f.split('.').pop()?.toLowerCase() || '';
+    return ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'mp4', 'webm', 'mov', 'avi', 'mkv'].includes(ext);
+  };
+  const isVideo = (f: string) => {
+    const ext = f.split('.').pop()?.toLowerCase() || '';
+    return ['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(ext);
+  };
+
+  return (
+    <div className="mt-12 mb-8">
+      <Separator className="mb-8" />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className="flex items-center gap-2">
+          <ImageIcon className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-bold">Your Media Assets</h2>
+          <Badge variant="secondary" className="text-[10px] font-mono">
+            {assets.length} files
+          </Badge>
+        </div>
+        <Button
+          size="sm"
+          className="h-8"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading || isRebuilding}
+        >
+          {isUploading ? (
+            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Upload className="h-4 w-4 mr-2" />
+          )}
+          {isUploading ? 'Uploading...' : 'Upload Assets'}
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          className="hidden"
+          onChange={handleUpload}
+        />
+      </div>
+
+      <p className="text-xs text-muted-foreground mb-4">
+        Upload images and videos to use as retrieval media. After upload, AI embeddings are automatically built so these assets appear in search results.
+      </p>
+
+      {/* Status Banner */}
+      {rebuildStatus === 'building' && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 mb-4 flex items-center gap-3">
+          <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+          <p className="text-xs text-primary font-medium">{rebuildMessage}</p>
+        </div>
+      )}
+      {rebuildStatus === 'ready' && (
+        <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-3 mb-4 flex items-center gap-3">
+          <CheckCircle className="h-4 w-4 text-green-500" />
+          <p className="text-xs text-green-600 dark:text-green-400 font-medium">{rebuildMessage}</p>
+        </div>
+      )}
+      {rebuildStatus === 'error' && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 mb-4 flex items-center gap-3">
+          <X className="h-4 w-4 text-destructive" />
+          <p className="text-xs text-destructive font-medium">{rebuildMessage}</p>
+        </div>
+      )}
+
+      {/* Asset count summary */}
+      {assets.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {assets.length} media file{assets.length !== 1 ? 's' : ''} in your asset library
+        </p>
+      )}
     </div>
   );
 }

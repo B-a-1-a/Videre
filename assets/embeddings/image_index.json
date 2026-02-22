@@ -1,5 +1,6 @@
 [
   "food1.jpg",
+  "food3.jpg",
   "random1.webp",
   "random2.jpg",
   "random3.jpg",
@@ -19,5 +20,10 @@
   "hungry2.mp4#4.0-7.9",
   "hungry2.mp4#7.9-11.9",
   "hungry2.mp4#11.9-15.8",
-  "hungry2.mp4#15.8-19.8"
+  "hungry2.mp4#15.8-19.8",
+  "sleep.mp4#0.0-2.1",
+  "sleep.mp4#2.1-4.1",
+  "sleep.mp4#4.1-6.2",
+  "sleep.mp4#6.2-8.3",
+  "sleep.mp4#8.3-10.4"
 ]

@@ -1135,6 +1135,94 @@ app.post('/retrieve-media', async (req: Request, res: Response): Promise<void> =
   }
 });
 
+// --- Asset management for retrieval ---
+
+// List existing assets
+app.get('/list-assets', (_req: Request, res: Response) => {
+  try {
+    if (!fs.existsSync(ASSETS_DIR)) {
+      res.json({ assets: [] });
+      return;
+    }
+    const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.bmp']);
+    const VIDEO_EXT = new Set(['.mp4', '.webm', '.mov', '.avi', '.mkv']);
+    const files = fs.readdirSync(ASSETS_DIR).filter((f: string) => {
+      const ext = path.extname(f).toLowerCase();
+      return IMAGE_EXT.has(ext) || VIDEO_EXT.has(ext);
+    });
+    res.json({ assets: files });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to list assets.' });
+  }
+});
+
+// Upload asset files to assets/ directory
+const assetUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      if (!fs.existsSync(ASSETS_DIR)) {
+        fs.mkdirSync(ASSETS_DIR, { recursive: true });
+      }
+      cb(null, ASSETS_DIR);
+    },
+    filename: (_req, file, cb) => {
+      cb(null, file.originalname);
+    },
+  }),
+});
+
+app.post('/upload-asset', assetUpload.array('files', 20), (req: Request, res: Response) => {
+  const files = req.files as Express.Multer.File[] | undefined;
+  if (!files || files.length === 0) {
+    res.status(400).json({ error: 'No files uploaded.' });
+    return;
+  }
+  const uploaded = files.map((f) => f.originalname);
+  console.log(`📦 Assets uploaded: ${uploaded.join(', ')}`);
+  res.json({ uploaded });
+});
+
+// Rebuild embeddings by running build_image_embeddings.py
+const BUILD_EMBEDDINGS_SCRIPT = path.resolve('./scripts/build_image_embeddings.py');
+
+app.post('/rebuild-embeddings', (_req: Request, res: Response) => {
+  try {
+    if (!fs.existsSync(BUILD_EMBEDDINGS_SCRIPT)) {
+      res.status(500).json({ error: 'Embeddings build script not found.' });
+      return;
+    }
+
+    const pythonBin = fs.existsSync(VENV_PYTHON) ? VENV_PYTHON : 'python';
+
+    console.log('🔄 Rebuilding embeddings...');
+    const runner = spawn(pythonBin, [BUILD_EMBEDDINGS_SCRIPT], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+    runner.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8'); });
+    runner.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8'); });
+
+    runner.on('close', (code) => {
+      if (code !== 0) {
+        console.error('Embeddings build error:', stderr);
+        res.status(500).json({ error: `Build failed (exit ${code}): ${stderr.trim().slice(0, 300)}` });
+        return;
+      }
+      console.log('✅ Embeddings rebuilt successfully');
+      console.log(stdout);
+      res.json({ success: true, output: stdout.trim() });
+    });
+
+    runner.on('error', (error) => {
+      res.status(500).json({ error: `Failed to run build: ${error.message}` });
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to rebuild embeddings.' });
+  }
+});
+
 app.post('/render', async (req, res) => {
   try {
     // Get input props from POST body
