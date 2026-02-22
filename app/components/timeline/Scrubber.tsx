@@ -315,6 +315,9 @@ export const Scrubber: React.FC<ScrubberProps> = ({
               trimBefore,
               trimAfter,
             };
+            // #region agent log
+            fetch('http://127.0.0.1:7320/ingest/d71a00c7-2873-4c78-a303-0745571cd7ff',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89a021'},body:JSON.stringify({sessionId:'89a021',runId:'initial',hypothesisId:'H1',location:'Scrubber.tsx:left-resize-timed',message:'Computed timed left-trim update',data:{scrubberId:scrubber.id,mediaType:scrubber.mediaType,playbackRate,originalDurationFrames,old:{left:scrubber.left,width:scrubber.width,trimBefore:scrubber.trimBefore,trimAfter:scrubber.trimAfter},next:{left:normalizedLeft,width:normalizedWidth,trimBefore,trimAfter},derived:{sourceFrames,maxSourceFrames}},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             onUpdate(newScrubber);
             return;
           }
@@ -402,6 +405,9 @@ export const Scrubber: React.FC<ScrubberProps> = ({
               trimBefore,
               trimAfter,
             };
+            // #region agent log
+            fetch('http://127.0.0.1:7320/ingest/d71a00c7-2873-4c78-a303-0745571cd7ff',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'89a021'},body:JSON.stringify({sessionId:'89a021',runId:'initial',hypothesisId:'H1',location:'Scrubber.tsx:right-resize-timed',message:'Computed timed right-trim update',data:{scrubberId:scrubber.id,mediaType:scrubber.mediaType,playbackRate,originalDurationFrames,old:{left:scrubber.left,width:scrubber.width,trimBefore:scrubber.trimBefore,trimAfter:scrubber.trimAfter},next:{left:scrubber.left,width:normalizedWidth,trimBefore,trimAfter},derived:{sourceFrames,maxSourceFrames,maxWidthByTimeline}},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             onUpdate(newScrubber);
             return;
           }
