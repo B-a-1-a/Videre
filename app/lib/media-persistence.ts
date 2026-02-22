@@ -103,7 +103,13 @@ function toDecodedStoragePath(value: string): string {
   return value
     .split("/")
     .filter(Boolean)
-    .map((segment) => decodeURIComponent(segment))
+    .map((segment) => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    })
     .join("/");
 }
 
