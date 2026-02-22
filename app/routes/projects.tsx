@@ -4,7 +4,7 @@ import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { useNavigate } from "react-router";
 import { useAuth } from "~/hooks/useAuth";
-import { ProfileMenu } from "~/components/ui/ProfileMenu";
+import { useTheme } from "next-themes";
 import {
   Plus,
   ChevronDown,
@@ -16,6 +16,8 @@ import {
   Trash2,
   MoreVertical,
   Clapperboard,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { VidereLogo } from "~/components/ui/VidereLogo";
 import {
@@ -168,7 +170,8 @@ export default function Projects() {
   const [creating, setCreating] = useState(false);
   const [sortBy, setSortBy] = useState<"created_desc" | "created_asc" | "name_asc" | "name_desc">("created_desc");
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [renameProjectId, setRenameProjectId] = useState<string | null>(null);
@@ -275,11 +278,15 @@ export default function Projects() {
         </div>
         <div className="flex items-center gap-2">
           {user && (
-            <ProfileMenu
-              user={{ name: user.name, email: user.email, image: user.image }}
-              starCount={null}
-              onSignOut={signOut}
-            />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground relative z-50 transition-colors"
+              title="Switch Theme"
+            >
+              {theme === "dark" ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+            </Button>
           )}
         </div>
       </header>

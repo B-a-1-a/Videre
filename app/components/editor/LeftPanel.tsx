@@ -69,7 +69,6 @@ export default function LeftPanel({
   const getActiveTab = () => {
     if (location.pathname.includes("/media-bin")) return "media-bin";
     if (location.pathname.includes("/text-editor")) return "text-editor";
-    if (location.pathname.includes("/transitions")) return "transitions";
     if (location.pathname.includes("/captions")) return "captions";
     return "media-bin"; // default
   };
@@ -105,7 +104,7 @@ export default function LeftPanel({
 
         {/* Tab Headers (bottom dock) */}
         <div className="border-t border-border bg-muted/30">
-          <TabsList className="grid w-full grid-cols-4 h-9 bg-transparent p-0">
+          <TabsList className="grid w-full grid-cols-3 h-9 bg-transparent p-0">
             <TabsTrigger
               value="media-bin"
               asChild
@@ -122,15 +121,6 @@ export default function LeftPanel({
             >
               <Link to="text-editor" className="flex items-center gap-1.5">
                 <Type className="h-3 w-3" />
-              </Link>
-            </TabsTrigger>
-            <TabsTrigger
-              value="transitions"
-              asChild
-              className="h-8 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
-            >
-              <Link to="transitions" className="flex items-center gap-1.5">
-                <BetweenVerticalEnd className="h-3 w-3" />
               </Link>
             </TabsTrigger>
             <TabsTrigger

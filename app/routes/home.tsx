@@ -12,6 +12,9 @@ import {
   Save as SaveIcon,
   CornerUpLeft,
   CornerUpRight,
+  ArrowLeft,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 // Custom video controls
@@ -24,7 +27,6 @@ import { RenderStatus } from "~/components/timeline/RenderStatus";
 import { TimelineRuler } from "~/components/timeline/TimelineRuler";
 import { TimelineTracks } from "~/components/timeline/TimelineTracks";
 import { Button } from "~/components/ui/button";
-import { ProfileMenu } from "~/components/ui/ProfileMenu";
 import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
 import { Switch } from "~/components/ui/switch";
@@ -50,6 +52,7 @@ import { useNavigate, useParams } from "react-router";
 import { ChatBox } from "~/components/chat/ChatBox";
 import { VidereLogo } from "~/components/ui/VidereLogo";
 import { useAuth } from "~/hooks/useAuth";
+import { useTheme } from "next-themes";
 import type {
   ApplyTranscriptEditRequest,
   ApplyTranscriptEditResult,
@@ -100,6 +103,7 @@ export default function TimelineEditor() {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<PlayerRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { theme, setTheme } = useTheme();
 
   const navigate = useNavigate();
   const params = useParams();
@@ -490,8 +494,8 @@ export default function TimelineEditor() {
 
       const hydratedClipTranscripts =
         payload.clipTranscripts &&
-        typeof payload.clipTranscripts === "object" &&
-        !Array.isArray(payload.clipTranscripts)
+          typeof payload.clipTranscripts === "object" &&
+          !Array.isArray(payload.clipTranscripts)
           ? payload.clipTranscripts
           : {};
       setClipTranscripts(hydratedClipTranscripts);
@@ -499,12 +503,12 @@ export default function TimelineEditor() {
       const viewState = {
         zoomLevel:
           Number.isFinite(Number(payload.editorState?.zoomLevel)) &&
-          Number(payload.editorState?.zoomLevel) > 0
+            Number(payload.editorState?.zoomLevel) > 0
             ? Number(payload.editorState?.zoomLevel)
             : 1,
         timelineWidth:
           Number.isFinite(Number(payload.editorState?.timelineWidth)) &&
-          Number(payload.editorState?.timelineWidth) > 0
+            Number(payload.editorState?.timelineWidth) > 0
             ? Math.round(Number(payload.editorState?.timelineWidth))
             : 2000,
       };
@@ -1007,8 +1011,17 @@ export default function TimelineEditor() {
       {/* Ultra-minimal Top Bar */}
       <header className="h-9 border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between px-3 shrink-0">
         <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/projects")}
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            title="Back to Projects"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <VidereLogo className="h-4 w-4" />
-          <h1 className="text-sm font-medium tracking-tight">Videre Studio</h1>
+          <h1 className="text-sm font-medium tracking-tight truncate hidden sm:inline-block">Videre Studio</h1>
         </div>
 
         {/* Center project name */}
@@ -1043,8 +1056,16 @@ export default function TimelineEditor() {
             {isRendering ? "Rendering..." : "Export"}
           </Button>
 
-          {/* Auth status — keep avatar as the last item (right corner) */}
-          {user && <ProfileMenu user={user} starCount={null} onSignOut={signOut} />}
+          {/* Theme Switcher */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            title="Switch Theme"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
         </div>
       </header>
 
