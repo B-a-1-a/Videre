@@ -40,12 +40,17 @@ export const useRenderer = () => {
           let maxWidth = 0;
           for (const item of timelineData) {
             for (const scrubber of item.scrubbers) {
-              if (
-                scrubber.media_width !== null &&
-                scrubber.media_width > maxWidth
-              ) {
-                maxWidth = scrubber.media_width;
-              }
+              if (scrubber.mediaType === "audio") continue;
+              const offsetX =
+                scrubber.mediaType === "text" &&
+                Number.isFinite(scrubber.trackOffsetX)
+                  ? Number(scrubber.trackOffsetX)
+                  : 0;
+              const rightEdge = Math.max(
+                0,
+                scrubber.left_player + offsetX + scrubber.width_player
+              );
+              if (rightEdge > maxWidth) maxWidth = rightEdge;
             }
           }
           compositionWidth = maxWidth || 1920; // Default to 1920 if no media found
@@ -56,12 +61,17 @@ export const useRenderer = () => {
           let maxHeight = 0;
           for (const item of timelineData) {
             for (const scrubber of item.scrubbers) {
-              if (
-                scrubber.media_height !== null &&
-                scrubber.media_height > maxHeight
-              ) {
-                maxHeight = scrubber.media_height;
-              }
+              if (scrubber.mediaType === "audio") continue;
+              const offsetY =
+                scrubber.mediaType === "text" &&
+                Number.isFinite(scrubber.trackOffsetY)
+                  ? Number(scrubber.trackOffsetY)
+                  : 0;
+              const bottomEdge = Math.max(
+                0,
+                scrubber.top_player + offsetY + scrubber.height_player
+              );
+              if (bottomEdge > maxHeight) maxHeight = bottomEdge;
             }
           }
           compositionHeight = maxHeight || 1080; // Default to 1080 if no media found

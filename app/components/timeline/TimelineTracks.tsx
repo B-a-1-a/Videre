@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Trash2 } from "lucide-react";
+import React, { useEffect } from "react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Scrubber } from "./Scrubber";
@@ -43,6 +43,10 @@ interface TimelineTracksProps {
   onGroupScrubbers: () => void;
   onUngroupScrubber: (scrubberId: string) => void;
   onMoveToMediaBin?: (scrubberId: string) => void;
+  onUpdateTrackTransform?: (
+    trackId: string,
+    patch: { captionOffsetX?: number; captionOffsetY?: number }
+  ) => void;
 }
 
 export const TimelineTracks: React.FC<TimelineTracksProps> = ({
@@ -67,9 +71,9 @@ export const TimelineTracks: React.FC<TimelineTracksProps> = ({
   onGroupScrubbers,
   onUngroupScrubber,
   onMoveToMediaBin,
+  onUpdateTrackTransform,
 }) => {
-  const [scrollTop, setScrollTop] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
+  const NUDGE_PX = 10;
 
   // Sync track controls with timeline scroll
   useEffect(() => {
@@ -77,8 +81,6 @@ export const TimelineTracks: React.FC<TimelineTracksProps> = ({
     if (!container) return;
 
     const handleScroll = () => {
-      setScrollTop(container.scrollTop);
-      setScrollLeft(container.scrollLeft);
       onScroll();
     };
 
@@ -113,7 +115,87 @@ export const TimelineTracks: React.FC<TimelineTracksProps> = ({
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
-              <span className="text-xs text-foreground font-medium select-none">Track {index + 1}</span>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs text-foreground font-medium select-none truncate">
+                  {track.id.startsWith("caption-track-")
+                    ? `Caption ${index + 1}`
+                    : `Track ${index + 1}`}
+                </div>
+                {track.id.startsWith("caption-track-") && onUpdateTrackTransform && (
+                  <div className="flex items-center gap-0.5 mt-0.5">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-4 w-4 p-0"
+                      title="Move captions left"
+                      onClick={() =>
+                        onUpdateTrackTransform(track.id, {
+                          captionOffsetX:
+                            (track.transform?.captionOffsetX ?? 0) - NUDGE_PX,
+                        })
+                      }
+                    >
+                      <ArrowLeft className="h-2.5 w-2.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-4 w-4 p-0"
+                      title="Move captions up"
+                      onClick={() =>
+                        onUpdateTrackTransform(track.id, {
+                          captionOffsetY:
+                            (track.transform?.captionOffsetY ?? 0) - NUDGE_PX,
+                        })
+                      }
+                    >
+                      <ArrowUp className="h-2.5 w-2.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-4 w-4 p-0"
+                      title="Reset caption position"
+                      onClick={() =>
+                        onUpdateTrackTransform(track.id, {
+                          captionOffsetX: 0,
+                          captionOffsetY: 0,
+                        })
+                      }
+                    >
+                      <RotateCcw className="h-2.5 w-2.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-4 w-4 p-0"
+                      title="Move captions down"
+                      onClick={() =>
+                        onUpdateTrackTransform(track.id, {
+                          captionOffsetY:
+                            (track.transform?.captionOffsetY ?? 0) + NUDGE_PX,
+                        })
+                      }
+                    >
+                      <ArrowDown className="h-2.5 w-2.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-4 w-4 p-0"
+                      title="Move captions right"
+                      onClick={() =>
+                        onUpdateTrackTransform(track.id, {
+                          captionOffsetX:
+                            (track.transform?.captionOffsetX ?? 0) + NUDGE_PX,
+                        })
+                      }
+                    >
+                      <ArrowRight className="h-2.5 w-2.5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
               {/* Track indicator line */}
               <div className="absolute right-0 top-0 bottom-0 w-px bg-border/50" />
             </div>

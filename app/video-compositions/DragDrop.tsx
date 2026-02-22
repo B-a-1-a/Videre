@@ -146,12 +146,16 @@ export const SelectionOutline: React.FC<{
   setSelectedItem: React.Dispatch<React.SetStateAction<string | null>>;
   selectedItem: string | null;
   isDragging: boolean;
+  trackOffsetX?: number;
+  trackOffsetY?: number;
 }> = ({
   ScrubberState,
   changeItem,
   setSelectedItem,
   selectedItem,
   isDragging,
+  trackOffsetX = 0,
+  trackOffsetY = 0,
 }) => {
   // console.log("SelectionOutline", JSON.stringify(ScrubberState, null, 2));
   const scale = useCurrentScale();
@@ -174,8 +178,8 @@ export const SelectionOutline: React.FC<{
     return {
       width: ScrubberState.width_player,
       height: ScrubberState.height_player,
-      left: ScrubberState.left_player,
-      top: ScrubberState.top_player,
+      left: ScrubberState.left_player + trackOffsetX,
+      top: ScrubberState.top_player + trackOffsetY,
       position: "absolute",
       outline:
         (hovered && !isDragging) || isSelected
@@ -184,7 +188,15 @@ export const SelectionOutline: React.FC<{
       userSelect: "none",
       touchAction: "none",
     };
-  }, [ScrubberState, hovered, isDragging, isSelected, scaledBorder]);
+  }, [
+    ScrubberState,
+    hovered,
+    isDragging,
+    isSelected,
+    scaledBorder,
+    trackOffsetX,
+    trackOffsetY,
+  ]);
 
   const startDragging = useCallback(
     (e: PointerEvent | React.MouseEvent) => {
@@ -318,7 +330,24 @@ export const SortedOutlines: React.FC<{
     [timeline]
   );
 
+  const trackOffsetByScrubberId = React.useMemo(() => {
+    const offsetMap = new Map<string, { x: number; y: number }>();
+    for (const track of timeline.tracks) {
+      const x = Number.isFinite(track.transform?.captionOffsetX)
+        ? Number(track.transform?.captionOffsetX)
+        : 0;
+      const y = Number.isFinite(track.transform?.captionOffsetY)
+        ? Number(track.transform?.captionOffsetY)
+        : 0;
+      for (const scrubber of track.scrubbers) {
+        offsetMap.set(scrubber.id, { x, y });
+      }
+    }
+    return offsetMap;
+  }, [timeline]);
+
   return itemsToDisplay.map((ScrubberState) => {
+    const scrubberOffset = trackOffsetByScrubberId.get(ScrubberState.id);
     return (
       <Sequence
         key={ScrubberState.id}
@@ -334,6 +363,8 @@ export const SortedOutlines: React.FC<{
           setSelectedItem={setSelectedItem}
           selectedItem={selectedItem}
           isDragging={isDragging}
+          trackOffsetX={scrubberOffset?.x ?? 0}
+          trackOffsetY={scrubberOffset?.y ?? 0}
         />
       </Sequence>
     );
