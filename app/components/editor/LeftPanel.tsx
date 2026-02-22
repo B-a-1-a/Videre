@@ -6,6 +6,8 @@ import type {
   ApplyTranscriptEditRequest,
   ApplyTranscriptEditResult,
   ClipTranscriptsMap,
+  GenerateClipCaptionsRequest,
+  GenerateClipCaptionsResult,
 } from "~/components/media/captions.types";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 
@@ -37,6 +39,9 @@ interface LeftPanelProps {
   onApplyTranscriptEdit: (
     request: ApplyTranscriptEditRequest
   ) => ApplyTranscriptEditResult;
+  onGenerateClipCaptions: (
+    request: GenerateClipCaptionsRequest
+  ) => GenerateClipCaptionsResult;
   projectId?: string;
 }
 
@@ -55,6 +60,7 @@ export default function LeftPanel({
   clipTranscripts,
   onClipTranscriptsChange,
   onApplyTranscriptEdit,
+  onGenerateClipCaptions,
   projectId,
 }: LeftPanelProps) {
   const location = useLocation();
@@ -91,6 +97,7 @@ export default function LeftPanel({
               clipTranscripts,
               onClipTranscriptsChange,
               onApplyTranscriptEdit,
+              onGenerateClipCaptions,
               projectId,
             }}
           />

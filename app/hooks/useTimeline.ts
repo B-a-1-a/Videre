@@ -12,6 +12,10 @@ import {
   type Transition,
   FPS,
 } from "../components/timeline/types";
+import type {
+  GenerateClipCaptionsRequest,
+  GenerateClipCaptionsResult,
+} from "../components/media/captions.types";
 import { generateUUID } from "../utils/uuid";
 import { toast } from "sonner";
 
@@ -995,6 +999,299 @@ export const useTimeline = () => {
     [getPixelsPerSecond, snapshotTimeline, timeline]
   );
 
+  const handleGenerateCaptionsFromTranscript = useCallback(
+    (
+      request: GenerateClipCaptionsRequest
+    ): GenerateClipCaptionsResult => {
+      const referenceTrackIndex = timeline.tracks.findIndex((track) =>
+        track.scrubbers.some((scrubber) => scrubber.id === request.referenceScrubberId)
+      );
+      if (referenceTrackIndex < 0) {
+        return {
+          success: false,
+          referenceScrubberId: request.referenceScrubberId,
+          captionTrackId: null,
+          createdScrubberIds: [],
+          error: "Reference clip was not found in the timeline.",
+        };
+      }
+
+      const referenceTrack = timeline.tracks[referenceTrackIndex];
+      const referenceScrubber =
+        referenceTrack.scrubbers.find(
+          (scrubber) => scrubber.id === request.referenceScrubberId
+        ) || null;
+      if (!referenceScrubber) {
+        return {
+          success: false,
+          referenceScrubberId: request.referenceScrubberId,
+          captionTrackId: null,
+          createdScrubberIds: [],
+          error: "Reference clip was not found in the timeline.",
+        };
+      }
+
+      if (
+        referenceScrubber.mediaType !== "video" &&
+        referenceScrubber.mediaType !== "audio"
+      ) {
+        return {
+          success: false,
+          referenceScrubberId: request.referenceScrubberId,
+          captionTrackId: null,
+          createdScrubberIds: [],
+          error: "Reference clip must be video or audio.",
+        };
+      }
+
+      if (
+        !Number.isFinite(referenceScrubber.durationInSeconds) ||
+        referenceScrubber.durationInSeconds <= 0
+      ) {
+        return {
+          success: false,
+          referenceScrubberId: request.referenceScrubberId,
+          captionTrackId: null,
+          createdScrubberIds: [],
+          error: "Reference clip has an invalid duration.",
+        };
+      }
+
+      const clipStartSec = Math.max(0, (referenceScrubber.trimBefore || 0) / FPS);
+      const clipEndSec = Math.max(
+        clipStartSec + 1 / FPS,
+        referenceScrubber.durationInSeconds -
+          (referenceScrubber.trimAfter || 0) / FPS
+      );
+      const minDurationSec = 1 / FPS;
+      const sanitizedSegments = request.segments
+        .map((segment) => ({
+          text: String(segment.text || "").replace(/\s+/g, " ").trim(),
+          startSec: Number(segment.startSec),
+          endSec: Number(segment.endSec),
+        }))
+        .filter(
+          (segment) =>
+            segment.text.length > 0 &&
+            Number.isFinite(segment.startSec) &&
+            Number.isFinite(segment.endSec)
+        )
+        .map((segment) => ({
+          ...segment,
+          startSec: Math.max(
+            clipStartSec,
+            Math.min(clipEndSec, segment.startSec)
+          ),
+          endSec: Math.max(clipStartSec, Math.min(clipEndSec, segment.endSec)),
+        }))
+        .filter((segment) => segment.endSec - segment.startSec >= minDurationSec)
+        .sort((a, b) => a.startSec - b.startSec);
+
+      if (sanitizedSegments.length === 0) {
+        return {
+          success: false,
+          referenceScrubberId: request.referenceScrubberId,
+          captionTrackId: null,
+          createdScrubberIds: [],
+          error: "No usable caption segments were provided.",
+        };
+      }
+
+      const sequencedSegments: Array<{
+        text: string;
+        startSec: number;
+        endSec: number;
+      }> = [];
+      let previousEnd = clipStartSec;
+      for (const segment of sanitizedSegments) {
+        const startSec = Math.max(segment.startSec, previousEnd);
+        const endSec = Math.max(startSec + minDurationSec, segment.endSec);
+        if (endSec > clipEndSec) {
+          continue;
+        }
+        sequencedSegments.push({
+          text: segment.text,
+          startSec,
+          endSec,
+        });
+        previousEnd = endSec;
+      }
+
+      if (sequencedSegments.length === 0) {
+        return {
+          success: false,
+          referenceScrubberId: request.referenceScrubberId,
+          captionTrackId: null,
+          createdScrubberIds: [],
+          error: "Caption segments collapsed after timeline alignment.",
+        };
+      }
+
+      const fontSizeRaw = Number(request.textStyle.fontSize);
+      const fontSize = Number.isFinite(fontSizeRaw)
+        ? Math.max(12, Math.min(220, Math.round(fontSizeRaw)))
+        : 56;
+      const fontFamily = String(request.textStyle.fontFamily || "").trim() ||
+        "Inter, ui-sans-serif, system-ui, sans-serif";
+      const color = /^#[0-9A-F]{6}$/i.test(String(request.textStyle.color || "").trim())
+        ? String(request.textStyle.color).trim()
+        : "#FFFFFF";
+      const textAlign: "left" | "center" | "right" =
+        request.textStyle.textAlign === "left" ||
+        request.textStyle.textAlign === "right"
+          ? request.textStyle.textAlign
+          : "center";
+      const fontWeight: "normal" | "bold" =
+        request.textStyle.fontWeight === "bold" ? "bold" : "normal";
+
+      const frameWidth =
+        Number.isFinite(referenceScrubber.media_width) &&
+        referenceScrubber.media_width > 0
+          ? referenceScrubber.media_width
+          : 1920;
+      const frameHeight =
+        Number.isFinite(referenceScrubber.media_height) &&
+        referenceScrubber.media_height > 0
+          ? referenceScrubber.media_height
+          : 1080;
+      const captionWidthPlayer = Math.max(320, Math.round(frameWidth * 0.84));
+      const captionHeightPlayer = Math.max(96, Math.round(fontSize * 2));
+      const captionLeftPlayer = Math.max(
+        0,
+        Math.round((frameWidth - captionWidthPlayer) / 2)
+      );
+      const captionTopPlayer = Math.max(
+        0,
+        Math.round(
+          frameHeight -
+            captionHeightPlayer -
+            Math.max(48, frameHeight * 0.08)
+        )
+      );
+
+      const pixelsPerSecond = getPixelsPerSecond();
+      const captionTrackId = `caption-track-${request.referenceScrubberId}`;
+      const captionSourceMediaBinId = `caption-source-${request.referenceScrubberId}`;
+      const captionScrubbers: ScrubberState[] = sequencedSegments.map(
+        (segment, index) => {
+          const durationSec = Math.max(minDurationSec, segment.endSec - segment.startSec);
+          const relativeStartSec = Math.max(0, segment.startSec - clipStartSec);
+          const width = Math.max(durationSec * pixelsPerSecond, pixelsPerSecond / FPS);
+          const estimatedTextWidth = Math.max(
+            320,
+            Math.round(segment.text.length * Math.max(18, fontSize) * 0.52)
+          );
+          const estimatedTextHeight = Math.max(90, Math.round(fontSize * 1.8));
+
+          return {
+            id: generateUUID(),
+            left: referenceScrubber.left + relativeStartSec * pixelsPerSecond,
+            y: referenceTrackIndex,
+            width,
+            mediaType: "text",
+            mediaUrlLocal: null,
+            mediaUrlRemote: null,
+            storageKey: null,
+            name: `${referenceScrubber.name} Caption ${index + 1}`,
+            durationInSeconds: durationSec,
+            media_width: estimatedTextWidth,
+            media_height: estimatedTextHeight,
+            text: {
+              textContent: segment.text,
+              fontSize,
+              fontFamily,
+              color,
+              textAlign,
+              fontWeight,
+              template: null,
+            },
+            groupped_scrubbers: null,
+            sourceMediaBinId: captionSourceMediaBinId,
+            left_player: captionLeftPlayer,
+            top_player: captionTopPlayer,
+            width_player: captionWidthPlayer,
+            height_player: captionHeightPlayer,
+            is_dragging: false,
+            uploadProgress: null,
+            isUploading: false,
+            trimBefore: null,
+            trimAfter: null,
+            left_transition_id: null,
+            right_transition_id: null,
+          };
+        }
+      );
+
+      const createdScrubberIds = captionScrubbers.map((scrubber) => scrubber.id);
+      snapshotTimeline();
+      setTimeline((prev) => {
+        const tracks = [...prev.tracks];
+        let captionTrackIndex = tracks.findIndex(
+          (track) => track.id === captionTrackId
+        );
+        if (captionTrackIndex < 0) {
+          tracks.push({
+            id: captionTrackId,
+            scrubbers: [],
+            transitions: [],
+          });
+          captionTrackIndex = tracks.length - 1;
+        }
+
+        const captionTrack = tracks[captionTrackIndex];
+        const shouldReplace = request.replaceExisting !== false;
+        const removedCaptionIds = shouldReplace
+          ? new Set(
+              captionTrack.scrubbers
+                .filter(
+                  (scrubber) =>
+                    scrubber.sourceMediaBinId === captionSourceMediaBinId
+                )
+                .map((scrubber) => scrubber.id)
+            )
+          : new Set<string>();
+
+        const retainedScrubbers = captionTrack.scrubbers.filter((scrubber) => {
+          if (!shouldReplace) return true;
+          return scrubber.sourceMediaBinId !== captionSourceMediaBinId;
+        });
+
+        tracks[captionTrackIndex] = {
+          ...captionTrack,
+          scrubbers: [
+            ...retainedScrubbers,
+            ...captionScrubbers.map((scrubber) => ({
+              ...scrubber,
+              y: captionTrackIndex,
+            })),
+          ].sort((a, b) => a.left - b.left),
+          transitions: captionTrack.transitions.filter((transition) => {
+            if (!shouldReplace) return true;
+            const leftId = transition.leftScrubberId || "";
+            const rightId = transition.rightScrubberId || "";
+            return (
+              !removedCaptionIds.has(leftId) && !removedCaptionIds.has(rightId)
+            );
+          }),
+        };
+
+        return {
+          ...prev,
+          tracks,
+        };
+      });
+
+      return {
+        success: true,
+        referenceScrubberId: request.referenceScrubberId,
+        captionTrackId,
+        createdScrubberIds,
+        error: null,
+      };
+    },
+    [getPixelsPerSecond, snapshotTimeline, timeline]
+  );
+
   // Transition management functions
   const validateTransitionPlacement = useCallback(
     (
@@ -1896,6 +2193,7 @@ export const useTimeline = () => {
     handleDropOnTrack,
     handleSplitScrubberAtRuler,
     handleCutScrubberWithSegments,
+    handleGenerateCaptionsFromTranscript,
     handleZoomIn,
     handleZoomOut,
     handleZoomReset,

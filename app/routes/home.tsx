@@ -54,6 +54,8 @@ import type {
   ApplyTranscriptEditRequest,
   ApplyTranscriptEditResult,
   ClipTranscriptsMap,
+  GenerateClipCaptionsRequest,
+  GenerateClipCaptionsResult,
 } from "~/components/media/captions.types";
 import {
   buildTranscribeJobFromScrubber,
@@ -149,6 +151,7 @@ export default function TimelineEditor() {
     handleDropOnTrack,
     handleSplitScrubberAtRuler,
     handleCutScrubberWithSegments,
+    handleGenerateCaptionsFromTranscript,
     handleZoomIn,
     handleZoomOut,
     handleZoomReset,
@@ -857,6 +860,13 @@ export default function TimelineEditor() {
     [clipTranscripts, handleCutScrubberWithSegments]
   );
 
+  const handleGenerateClipCaptions = useCallback(
+    (request: GenerateClipCaptionsRequest): GenerateClipCaptionsResult => {
+      return handleGenerateCaptionsFromTranscript(request);
+    },
+    [handleGenerateCaptionsFromTranscript]
+  );
+
   const expandTimelineCallback = useCallback(() => {
     return expandTimeline(containerRef);
   }, [expandTimeline]);
@@ -1058,6 +1068,7 @@ export default function TimelineEditor() {
               clipTranscripts={clipTranscripts}
               onClipTranscriptsChange={setClipTranscripts}
               onApplyTranscriptEdit={handleApplyTranscriptEdit}
+              onGenerateClipCaptions={handleGenerateClipCaptions}
               projectId={projectId}
             />
           </div>
