@@ -63,34 +63,60 @@ Shortcut:
 
 ## Local Whisper Setup
 
-The Captions tab uses a local Python runner with
-`transformers` + `openai/whisper-small`.
+The Captions tab transcribes clips with a local Python runner. By default it
+uses **Whisper on the Snapdragon NPU** (`nexa-caption-lab` + `onnxruntime-qnn`).
+You can switch to the legacy **transformers** pipeline for testing via the
+"Use legacy Whisper (transformers) for testing" option in the Captions panel.
 
-### Install Python Dependencies
+### Default: NPU (Whisper on Snapdragon NPU)
 
-Use a Python version supported by your local `torch` build
-(Python 3.11/3.12 is recommended).
+From the repo root, create a venv (Python 3.10+) and install the NPU backend:
+
+**Windows (PowerShell or cmd):**
+
+```powershell
+py -m venv .venv-whisper
+.venv-whisper\Scripts\activate
+pip install -e ./nexa-caption-lab[npu]
+```
+
+**macOS / Linux:**
 
 ```bash
 python3.12 -m venv .venv-whisper
 source .venv-whisper/bin/activate
+pip install -e ./nexa-caption-lab[npu]
+```
+
+This installs `onnxruntime-qnn` and `transformers`. The app will use
+`.venv-whisper\Scripts\python.exe` (Windows) or `.venv-whisper/bin/python`
+(Unix) automatically. NPU models go under `nexa-caption-lab/models/` and are
+downloaded on first use.
+
+### Optional: Legacy Whisper (transformers, for testing)
+
+To use the legacy script (`whisper_transcribe.py`) with torch + transformers,
+install in the same venv:
+
+```bash
 pip install -r app/videorender/requirements-whisper.txt
 ```
 
-The render server auto-detects `.venv-whisper/bin/python` first. If you use a
-different interpreter path, set `VIDERE_WHISPER_PYTHON`.
+Then enable "Use legacy Whisper (transformers) for testing" in the Captions
+tab when running transcription.
 
-### Optional Environment Overrides
+### Environment Overrides
 
-- `VIDERE_WHISPER_PYTHON` (default: `python3`)
-- `VIDERE_WHISPER_MODEL` (default: `openai/whisper-small`)
-- `VIDERE_WHISPER_DEVICE` (default: `auto`)
-- `VIDERE_WHISPER_FFMPEG_BIN` (default: `ffmpeg`)
+- `VIDERE_WHISPER_PYTHON` – Python interpreter (auto-detects `.venv-whisper`, `.venv`, then system).
+- `VIDERE_WHISPER_MODEL` – Model name (legacy only; default: `openai/whisper-small`).
+- `VIDERE_WHISPER_DEVICE` – Device for legacy (default: `auto`).
+- `VIDERE_WHISPER_FFMPEG_BIN` – ffmpeg binary (default: `ffmpeg`).
+- `VIDERE_NPU_MODELS_DIR` – Override NPU model root (default: `nexa-caption-lab/models`).
 
 ### First Run Behavior
 
-The first transcription request downloads the Whisper model weights and may
-take noticeably longer than subsequent runs.
+The first transcription may download model weights (NPU or Hugging Face) and
+take longer than subsequent runs.
 
 ## Notes
 

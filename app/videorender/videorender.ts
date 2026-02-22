@@ -15,7 +15,12 @@ const FPS = 30;
 const DEFAULT_WHISPER_MODEL =
   process.env.VIDERE_WHISPER_MODEL || 'openai/whisper-small';
 const DEFAULT_WHISPER_TIMESTAMPS = 'word';
-const WHISPER_SCRIPT_PATH = path.resolve('./app/videorender/whisper_transcribe.py');
+const WHISPER_SCRIPT_PATH_NPU = path.resolve(
+  './app/videorender/whisper_npu_transcribe.py'
+);
+const WHISPER_SCRIPT_PATH_LEGACY = path.resolve(
+  './app/videorender/whisper_transcribe.py'
+);
 const WHISPER_REQUIREMENTS_PATH = path.resolve(
   './app/videorender/requirements-whisper.txt'
 );
@@ -24,8 +29,12 @@ const WHISPER_SETUP_HINT =
   `python3.12 -m venv .venv-whisper\n` +
   `.venv-whisper/bin/pip install -r ${WHISPER_REQUIREMENTS_PATH}\n` +
   `Or set VIDERE_WHISPER_PYTHON to a Python interpreter that has torch + transformers.`;
+const WHISPER_NPU_SETUP_HINT =
+  `Install NPU deps from repo root: pip install -e ./nexa-caption-lab[npu]\n` +
+  `Requires: onnxruntime-qnn, transformers. Or set VIDERE_WHISPER_PYTHON to a Python with nexa-caption-lab[npu].`;
 let isTranscriptionRunning = false;
-let cachedWhisperPython: string | null = null;
+let cachedWhisperPythonLegacy: string | null = null;
+let cachedWhisperPythonNpu: string | null = null;
 
 type TranscriptMediaType =
   | 'video'
@@ -221,33 +230,79 @@ function canProbeWhisperPython(pythonBin: string): { ok: boolean; reason?: strin
   return { ok: true };
 }
 
-function resolveWhisperPython(): string {
+function canProbeNpuPython(pythonBin: string): { ok: boolean; reason?: string } {
+  const probe = spawnSync(
+    pythonBin,
+    ['-c', 'import onnxruntime; from nexa_caption_lab.whisper_npu import transcribe_with_npu'],
+    {
+      encoding: 'utf8',
+      timeout: 20_000,
+      env: process.env,
+    }
+  );
+
+  if (probe.error) {
+    return { ok: false, reason: probe.error.message };
+  }
+  if (probe.status !== 0) {
+    const stderr = (probe.stderr || '').trim();
+    const stdout = (probe.stdout || '').trim();
+    const detail = stderr || stdout || `exit code ${probe.status}`;
+    return { ok: false, reason: detail };
+  }
+  return { ok: true };
+}
+
+function resolveWhisperPython(useLegacyWhisper: boolean): string {
   const forcedPython = (process.env.VIDERE_WHISPER_PYTHON || '').trim();
+  const probeLegacy = (bin: string) => canProbeWhisperPython(bin);
+  const probeNpu = (bin: string) => canProbeNpuPython(bin);
+  const probe = useLegacyWhisper ? probeLegacy : probeNpu;
+  const hint = useLegacyWhisper ? WHISPER_SETUP_HINT : WHISPER_NPU_SETUP_HINT;
+  const cacheKey = useLegacyWhisper ? 'Legacy' : 'Npu';
+  const getCache = () => (useLegacyWhisper ? cachedWhisperPythonLegacy : cachedWhisperPythonNpu);
+  const setCache = (bin: string) => {
+    if (useLegacyWhisper) cachedWhisperPythonLegacy = bin;
+    else cachedWhisperPythonNpu = bin;
+  };
+
   if (forcedPython) {
     const normalized = normalizeWhisperPythonCandidate(forcedPython);
-    const probe = canProbeWhisperPython(normalized);
-    if (probe.ok) {
-      cachedWhisperPython = normalized;
+    const result = probe(normalized);
+    if (result.ok) {
+      setCache(normalized);
       return normalized;
     }
     throw new Error(
-      `VIDERE_WHISPER_PYTHON is set to '${normalized}' but is not usable for Whisper: ${probe.reason}\n${WHISPER_SETUP_HINT}`
+      `VIDERE_WHISPER_PYTHON is set to '${normalized}' but is not usable for Whisper (${cacheKey}): ${result.reason}\n${hint}`
     );
   }
 
-  if (cachedWhisperPython) {
-    return cachedWhisperPython;
+  if (getCache()) {
+    return getCache() as string;
   }
 
+  const isWin = process.platform === 'win32';
   const candidates = [
+    // Unix venv
     '.venv-whisper/bin/python',
     '.venv-whisper/bin/python3',
     '.venv/bin/python',
     '.venv/bin/python3',
+    // Windows venv
+    ...(isWin
+      ? [
+          path.join('.venv-whisper', 'Scripts', 'python.exe'),
+          path.join('.venv-whisper', 'Scripts', 'python3.exe'),
+          path.join('.venv', 'Scripts', 'python.exe'),
+          path.join('.venv', 'Scripts', 'python3.exe'),
+        ]
+      : []),
     'python3.12',
     '/opt/homebrew/bin/python3.12',
     'python3.11',
     'python3',
+    'py',
     'python',
   ]
     .map((candidate) => normalizeWhisperPythonCandidate(candidate))
@@ -262,38 +317,41 @@ function resolveWhisperPython(): string {
       continue;
     }
 
-    const probe = canProbeWhisperPython(candidate);
-    if (probe.ok) {
-      cachedWhisperPython = candidate;
+    const result = probe(candidate);
+    if (result.ok) {
+      setCache(candidate);
       return candidate;
     }
-    failures.push(`${candidate} (${probe.reason || 'probe failed'})`);
+    failures.push(`${candidate} (${result.reason || 'probe failed'})`);
   }
 
+  const what = useLegacyWhisper
+    ? 'torch + transformers'
+    : 'nexa-caption-lab[npu] (onnxruntime-qnn)';
   throw new Error(
-    `No Python interpreter with torch + transformers was found. Tried: ${failures.join(
-      '; '
-    )}\n${WHISPER_SETUP_HINT}`
+    `No Python interpreter with ${what} was found. Tried: ${failures.join('; ')}\n${hint}`
   );
 }
 
 function runWhisperTranscription(
   jobs: WhisperClipJob[],
   model: string,
-  timestamps: string
+  timestamps: string,
+  useLegacyWhisper: boolean = false
 ): Promise<TranscribeClipResult[]> {
+  const scriptPath = useLegacyWhisper ? WHISPER_SCRIPT_PATH_LEGACY : WHISPER_SCRIPT_PATH_NPU;
   return new Promise((resolve, reject) => {
-    if (!fs.existsSync(WHISPER_SCRIPT_PATH)) {
+    if (!fs.existsSync(scriptPath)) {
       reject(
         new Error(
-          `Whisper runner script not found at ${WHISPER_SCRIPT_PATH}.`
+          `Whisper runner script not found at ${scriptPath}.`
         )
       );
       return;
     }
 
-    const pythonBin = resolveWhisperPython();
-    const runner = spawn(pythonBin, [WHISPER_SCRIPT_PATH], {
+    const pythonBin = resolveWhisperPython(useLegacyWhisper);
+    const runner = spawn(pythonBin, [scriptPath], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
@@ -644,6 +702,7 @@ app.post('/transcribe-clips', async (req: Request, res: Response): Promise<void>
 
     const model = toSingleString(body.model)?.trim() || DEFAULT_WHISPER_MODEL;
     const timestamps = toSingleString(body.timestamps)?.trim() || DEFAULT_WHISPER_TIMESTAMPS;
+    const useLegacyWhisper = Boolean(body.useLegacyWhisper);
     if (timestamps !== 'word') {
       res.status(400).json({ error: "Only timestamps='word' is supported." });
       return;
@@ -782,7 +841,7 @@ app.post('/transcribe-clips', async (req: Request, res: Response): Promise<void>
       let whisperResults: TranscribeClipResult[] = [];
       let runnerError: string | null = null;
       try {
-        whisperResults = await runWhisperTranscription(jobs, model, timestamps);
+        whisperResults = await runWhisperTranscription(jobs, model, timestamps, useLegacyWhisper);
       } catch (error) {
         runnerError =
           error instanceof Error

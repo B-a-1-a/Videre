@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
+import { Switch } from "~/components/ui/switch";
+import { Label } from "~/components/ui/label";
 import type {
   ClipTranscriptRecord,
   ClipTranscriptsMap,
@@ -90,6 +92,7 @@ export default function Captions() {
   } = useOutletContext<CaptionsContext>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingIds, setPendingIds] = useState<string[]>([]);
+  const [useLegacyWhisper, setUseLegacyWhisper] = useState(false);
 
   const selectedScrubbers = useMemo(() => {
     return selectedScrubberIds
@@ -193,6 +196,7 @@ export default function Captions() {
             model: "openai/whisper-small",
             timestamps: "word",
             clips: jobs,
+            useLegacyWhisper,
           }),
         });
 
@@ -278,7 +282,7 @@ export default function Captions() {
         setPendingIds([]);
       }
     },
-    [isSubmitting, onClipTranscriptsChange, projectId, timeline]
+    [isSubmitting, onClipTranscriptsChange, projectId, timeline, useLegacyWhisper]
   );
 
   const handleTranscribeSelected = useCallback(() => {
@@ -347,6 +351,19 @@ export default function Captions() {
             {isSubmitting ? "Transcribing..." : "Transcribe Selected"}
           </Button>
         </div>
+      </div>
+      <div className="px-2 py-1 border-b border-border/30 flex items-center gap-2">
+        <Switch
+          id="use-legacy-whisper"
+          checked={useLegacyWhisper}
+          onCheckedChange={setUseLegacyWhisper}
+        />
+        <Label
+          htmlFor="use-legacy-whisper"
+          className="text-[10px] text-muted-foreground cursor-pointer"
+        >
+          Use legacy Whisper (transformers) for testing
+        </Label>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto panel-scrollbar p-2 space-y-2">

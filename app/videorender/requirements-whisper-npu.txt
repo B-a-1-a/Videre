@@ -1,0 +1,10 @@
+# NPU transcription (default): Whisper on Snapdragon NPU via nexa-caption-lab.
+# From repo root, install the local package with NPU extras:
+#   pip install -e ./nexa-caption-lab[npu]
+# That pulls in: onnxruntime-qnn, transformers.
+#
+# If you cannot install from the repo (e.g. read-only env), install deps only:
+#   pip install -r app/videorender/requirements-whisper-npu.txt
+# and ensure nexa_caption_lab is on PYTHONPATH or install nexa-caption-lab from PyPI if published.
+onnxruntime-qnn
+transformers>=4.0
