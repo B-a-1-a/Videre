@@ -26,6 +26,8 @@ __pycache__/
 *.pyc
 .venv-whisper
 .venv
+venv
+chrome-headless-shell/
 
 # Windows reserved device names (cannot be indexed by Git on Windows)
 nul

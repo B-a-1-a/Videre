@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import { useOutletContext } from "react-router";
-import { Copy, RefreshCw, Speech } from "lucide-react";
+import { Copy, RefreshCw, Search, Speech } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
@@ -79,6 +79,12 @@ type AnalysisSuggestion = {
   description: string;
   startSec: number;
   endSec: number;
+};
+
+type RetrievalResult = {
+  filename: string;
+  score: number;
+  url: string;
 };
 
 function findScrubber(timeline: TimelineState, scrubberId: string): ScrubberState | null {
@@ -216,6 +222,10 @@ export default function Captions() {
   const [editedTranscriptById, setEditedTranscriptById] = useState<
     Record<string, string>
   >({});
+  const [retrievalByScrubberId, setRetrievalByScrubberId] = useState<
+    Record<string, RetrievalResult[]>
+  >({});
+  const [isRetrieving, setIsRetrieving] = useState(false);
 
   const selectedScrubbers = useMemo(() => {
     return selectedScrubberIds
@@ -263,6 +273,42 @@ export default function Captions() {
       return changed ? next : prev;
     });
   }, [clipTranscripts]);
+
+  const fetchRetrieval = useCallback(async (scrubberId: string, transcriptText: string) => {
+    try {
+      setIsRetrieving(true);
+      const response = await fetch(apiUrl("/retrieve-media"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: transcriptText, topK: 3 }),
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      if (payload.results && payload.results.length > 0) {
+        setRetrievalByScrubberId((prev) => ({
+          ...prev,
+          [scrubberId]: payload.results,
+        }));
+      }
+    } catch (err) {
+      console.warn("Retrieval failed:", err);
+    } finally {
+      setIsRetrieving(false);
+    }
+  }, []);
+
+  // Auto-trigger retrieval for transcripts that already exist but have no results
+  useEffect(() => {
+    for (const [scrubberId, record] of Object.entries(clipTranscripts)) {
+      if (
+        record.text &&
+        !record.error &&
+        !retrievalByScrubberId[scrubberId]
+      ) {
+        fetchRetrieval(scrubberId, record.text);
+      }
+    }
+  }, [clipTranscripts, fetchRetrieval]);
 
   const transcribeIds = useCallback(
     async (targetIds: string[]) => {
@@ -346,6 +392,14 @@ export default function Captions() {
         });
 
         toast.success("Transcription complete.");
+
+        // Auto-trigger retrieval for each transcribed clip
+        for (const job of jobs) {
+          const result = byId.get(job.scrubberId) as TranscribeClipResponseItem | undefined;
+          if (result && result.text && !result.error) {
+            fetchRetrieval(job.scrubberId, result.text);
+          }
+        }
       } catch (error) {
         const message =
           error instanceof Error
@@ -369,7 +423,7 @@ export default function Captions() {
         setPendingIds([]);
       }
     },
-    [isSubmitting, onClipTranscriptsChange, projectId, timeline]
+    [isSubmitting, onClipTranscriptsChange, projectId, timeline, fetchRetrieval]
   );
 
   const handleAnalyzeClips = useCallback(async (scrubberId: string) => {
@@ -645,6 +699,18 @@ export default function Captions() {
                             Analyze
                           </Button>
                         )}
+                        {!record.error && record.text && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-5 px-2 text-[10px]"
+                            disabled={isRetrieving}
+                            onClick={() => fetchRetrieval(scrubberId, record.text)}
+                          >
+                            <Search className="h-3 w-3 mr-1" />
+                            Retrieve
+                          </Button>
+                        )}
                         <Badge
                           variant={unavailableMessage ? "destructive" : "secondary"}
                           className="h-4 px-1.5 text-[10px] font-mono"
@@ -793,6 +859,55 @@ export default function Captions() {
                         )}
                       </>
                     ) : null}
+
+                    {/* Retrieval Loading */}
+                    {isRetrieving && !retrievalByScrubberId[scrubberId] && (
+                      <div className="mt-3 rounded-md border border-border/50 bg-muted/30 p-3 flex items-center gap-2">
+                        <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />
+                        <p className="text-[10px] text-muted-foreground">
+                          Finding related media... (loading AI model)
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Retrieval Results */}
+                    {retrievalByScrubberId[scrubberId] && retrievalByScrubberId[scrubberId].length > 0 && (
+                      <div className="mt-3 rounded-md border border-border/50 bg-muted/30 p-2">
+                        <p className="text-[10px] font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                          <Search className="h-3 w-3" />
+                          Related Media
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {retrievalByScrubberId[scrubberId].map((item, idx) => {
+                            const isVideo = item.filename.includes('.mp4') || item.filename.includes('.webm') || item.filename.includes('.mov');
+                            const baseUrl = apiUrl(item.url);
+                            return (
+                              <div key={idx} className="relative group rounded overflow-hidden border border-border/30 bg-background">
+                                {isVideo ? (
+                                  <video
+                                    src={baseUrl}
+                                    className="w-full h-16 object-cover"
+                                    muted
+                                    preload="metadata"
+                                  />
+                                ) : (
+                                  <img
+                                    src={baseUrl}
+                                    alt={item.filename}
+                                    className="w-full h-16 object-cover"
+                                  />
+                                )}
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-1 py-0.5">
+                                  <p className="text-[8px] text-white font-mono truncate">
+                                    {(item.score * 100).toFixed(0)}% • {item.filename.split('/').pop()}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

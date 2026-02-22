@@ -79,6 +79,9 @@ importers:
       '@remotion/cli':
         specifier: 4.0.329
         version: 4.0.329(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@remotion/compositor-win32-x64-msvc':
+        specifier: 4.0.329
+        version: 4.0.329
       '@remotion/media-parser':
         specifier: 4.0.329
         version: 4.0.329
@@ -5365,8 +5368,7 @@ snapshots:
   '@remotion/compositor-linux-x64-musl@4.0.329':
     optional: true
 
-  '@remotion/compositor-win32-x64-msvc@4.0.329':
-    optional: true
+  '@remotion/compositor-win32-x64-msvc@4.0.329': {}
 
   '@remotion/eslint-plugin@4.0.329(eslint@9.39.3(jiti@2.6.1))(typescript@5.8.3)':
     dependencies:

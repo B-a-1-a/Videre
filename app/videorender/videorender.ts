@@ -10,6 +10,11 @@ import { spawn, spawnSync } from 'child_process';
 // The composition you want to render
 const compositionId = 'TimelineComposition';
 const OUT_DIR = path.resolve(process.env.VIDERE_MEDIA_DIR || 'out');
+const ASSETS_DIR = path.resolve('./assets');
+const RETRIEVE_SCRIPT = path.resolve('./scripts/retrieve_by_text.py');
+const VENV_PYTHON = process.platform === 'win32'
+  ? path.resolve('./venv/Scripts/python.exe')
+  : path.resolve('./venv/bin/python');
 const PROJECT_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const FPS = 30;
 const DEFAULT_WHISPER_MODEL =
@@ -481,6 +486,12 @@ app.use(cors());
 
 // Static file serving for the out/ directory
 app.use('/media', express.static(OUT_DIR, {
+  dotfiles: 'deny',
+  index: false
+}));
+
+// Static file serving for the assets/ directory (retrieval media)
+app.use('/assets', express.static(ASSETS_DIR, {
   dotfiles: 'deny',
   index: false
 }));
@@ -1057,6 +1068,73 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Media retrieval endpoint – uses SigLIP2 embeddings to find relevant assets
+app.post('/retrieve-media', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const body = req.body as Record<string, unknown> | undefined;
+    if (!body || typeof body !== 'object') {
+      res.status(400).json({ error: 'Invalid request body.' });
+      return;
+    }
+
+    const query = typeof body.query === 'string' ? body.query.trim() : '';
+    if (!query) {
+      res.status(400).json({ error: 'Missing query text.' });
+      return;
+    }
+
+    const topK = typeof body.topK === 'number' && body.topK > 0 ? Math.min(body.topK, 20) : 1;
+
+    if (!fs.existsSync(RETRIEVE_SCRIPT)) {
+      res.status(500).json({ error: `Retrieval script not found at ${RETRIEVE_SCRIPT}` });
+      return;
+    }
+
+    const pythonBin = fs.existsSync(VENV_PYTHON) ? VENV_PYTHON : 'python';
+
+    const runner = spawn(pythonBin, [
+      RETRIEVE_SCRIPT,
+      query,
+      '-k', String(topK),
+      '--raw',
+    ], { stdio: ['pipe', 'pipe', 'pipe'] });
+
+    let stdout = '';
+    let stderr = '';
+    runner.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8'); });
+    runner.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8'); });
+
+    runner.on('close', (code) => {
+      if (code !== 0) {
+        console.error('Retrieval script error:', stderr);
+        res.status(500).json({ error: `Retrieval failed (exit ${code}): ${stderr.trim().slice(0, 300)}` });
+        return;
+      }
+
+      const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
+      const results = lines.map((line) => {
+        const [scoreStr, ...filenameParts] = line.split('\t');
+        const filename = filenameParts.join('\t');
+        const score = parseFloat(scoreStr);
+        // Strip #timestamp suffix for the URL path
+        const baseName = filename.split('#')[0];
+        const url = `/assets/${encodeURIComponent(baseName)}`;
+        return { filename, score: Number.isFinite(score) ? score : 0, url };
+      });
+
+      console.log(`🔍 Retrieval: "${query}" → ${results.length} results`);
+      res.json({ results });
+    });
+
+    runner.on('error', (error) => {
+      res.status(500).json({ error: `Failed to run retrieval: ${error.message}` });
+    });
+  } catch (error) {
+    console.error('Retrieve-media error:', error);
+    res.status(500).json({ error: 'Failed to retrieve media.' });
+  }
+});
+
 app.post('/render', async (req, res) => {
   try {
     // Get input props from POST body
@@ -1071,11 +1149,30 @@ app.post('/render', async (req, res) => {
 
     // console.log("Input props:", typeof inputProps.compositionWidth);
     console.log("Input props:", JSON.stringify(inputProps, null, 2));
+
+    // ARM64 Windows: Remotion has no ARM64 Chrome Headless Shell, and Edge
+    // headless is broken (exits immediately). Use manually downloaded x64
+    // Chrome Headless Shell which runs under Windows x86 emulation.
+    const chromeHeadlessShellPath = path.resolve(
+      './chrome-headless-shell/chrome-headless-shell-win64/chrome-headless-shell.exe'
+    );
+    const browserExecutable =
+      process.platform === 'win32' &&
+        process.arch === 'arm64' &&
+        fs.existsSync(chromeHeadlessShellPath)
+        ? chromeHeadlessShellPath
+        : undefined;
+
+    if (browserExecutable) {
+      console.log(`🌐 Using x64 Chrome Headless Shell under ARM64 emulation: ${browserExecutable}`);
+    }
+
     // Get the composition you want to render
     const composition = await selectComposition({
       serveUrl: bundleLocation,
       id: compositionId,
       inputProps,
+      browserExecutable,
     });
 
     // const maxFrames = Math.min(composition.durationInFrames, 150); // Max 5 seconds at 30fps
@@ -1085,6 +1182,7 @@ app.post('/render', async (req, res) => {
     await renderMedia({
       composition,
       serveUrl: bundleLocation,
+      browserExecutable,
       codec: 'h264',
       outputLocation: path.join(OUT_DIR, `${compositionId}.mp4`),
       inputProps,

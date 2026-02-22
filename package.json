@@ -12,7 +12,8 @@
     "build": "react-router build",
     "preview": "react-router-serve ./build/server/index.js --port 5173",
     "typecheck": "react-router typegen && tsc",
-    "lint": "eslint app electron eslint.config.js vite.config.ts react-router.config.ts --ext .ts,.tsx,.cjs"
+    "lint": "eslint app electron eslint.config.js vite.config.ts react-router.config.ts --ext .ts,.tsx,.cjs",
+    "postinstall": "node scripts/patch-remotion-arm64.cjs"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -33,6 +34,7 @@
     "@remotion/bundler": "4.0.329",
     "@remotion/captions": "4.0.331",
     "@remotion/cli": "4.0.329",
+    "@remotion/compositor-win32-x64-msvc": "4.0.329",
     "@remotion/media-parser": "4.0.329",
     "@remotion/player": "4.0.329",
     "@remotion/renderer": "4.0.329",

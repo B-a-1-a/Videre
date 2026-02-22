@@ -49,7 +49,7 @@ import {
   type Transition,
 } from "~/components/timeline/types";
 import { useNavigate, useParams } from "react-router";
-import { ChatBox } from "~/components/chat/ChatBox";
+import { RetrievalPanel } from "~/components/media/RetrievalPanel";
 import { VidereLogo } from "~/components/ui/VidereLogo";
 import { useAuth } from "~/hooks/useAuth";
 import { useTheme } from "next-themes";
@@ -1324,47 +1324,19 @@ export default function TimelineEditor() {
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={25} minSize={18} maxSize={40}>
           <div className="h-full border-l border-border flex flex-col">
-            {isChatMinimized ? (
-              <div className="h-full min-h-0 p-3">
-                <div className="h-full rounded-lg border border-border/50 bg-muted/20 flex items-start justify-end p-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setIsChatMinimized(false)}
-                    className="h-6 px-2 text-xs"
-                  >
-                    Open Chat
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="h-full min-h-0 flex flex-col">
-                <ChatBox
-                  className="flex-1 min-h-0"
-                  mediaBinItems={mediaBinItems}
-                  handleDropOnTrack={handleDropOnTrackWithAutoTranscribe}
-                  isMinimized={false}
-                  onToggleMinimize={() => setIsChatMinimized(true)}
-                  messages={chatMessages}
-                  onMessagesChange={setChatMessages}
-                  timelineState={timeline}
-                  handleUpdateScrubber={handleUpdateScrubberWithLocking}
-                  handleDeleteScrubber={handleDeleteScrubber}
-                />
-                <div className="p-3 border-t border-border bg-background mt-auto">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={handleRenderClick}
-                    disabled={isRendering}
-                    className="w-full h-9 font-medium"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    {isRendering ? "Rendering..." : "Export"}
-                  </Button>
-                </div>
-              </div>
-            )}
+            <RetrievalPanel clipTranscripts={clipTranscripts} />
+            <div className="p-3 border-t border-border bg-background mt-auto">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleRenderClick}
+                disabled={isRendering}
+                className="w-full h-9 font-medium"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {isRendering ? "Rendering..." : "Export"}
+              </Button>
+            </div>
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
