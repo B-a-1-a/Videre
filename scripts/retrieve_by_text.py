@@ -12,7 +12,8 @@ Runs fully offline after the first run (local_files_only=True).
 Usage:
   python scripts/retrieve_by_text.py "food"
   python scripts/retrieve_by_text.py "a skateboard" -k 3
-  python scripts/retrieve_by_text.py "i want food" --raw   # use exact query
+  # Default: one result per asset (best timestamp per video). Use --all-sections to show every section.
+  python scripts/retrieve_by_text.py "i want food" --raw
 
 Requires: pip install torch transformers numpy
 """
@@ -66,16 +67,21 @@ def get_text_embedding(model, tokenizer, text: str, device) -> np.ndarray:
     return feats.cpu().float().numpy()
 
 
+def _asset_key(entry: str) -> str:
+    """Key for deduplication: video file path (no timestamp) or image path."""
+    return entry.split("#")[0] if "#" in entry else entry
+
+
 def search(
     query: str,
     top_k: int = 5,
     embeddings_dir: Path | None = None,
     raw_query: bool = False,
+    unique: bool = True,
 ) -> list[tuple[str, float]]:
     """
     Return top-k (filename, score) pairs for the text query.
-    Score is cosine similarity in [0, 1] (higher = more similar).
-    If raw_query is False, query is wrapped as "This is a photo of <query>." for better matching.
+    If unique is True, at most one result per asset (per video: best timestamp; images: one per file).
     """
     dir_ = embeddings_dir or EMBEDDINGS_DIR
     embeddings, index = load_embeddings()
@@ -91,13 +97,25 @@ def search(
 
     text = query if raw_query else PROMPT_TEMPLATE.format(query.strip())
     q = get_text_embedding(model, tokenizer, text, device)
-    # Cosine similarity (embeddings already normalized)
     scores = (embeddings @ q.T).squeeze(1)
-    # Clamp to [0, 1] for display (cosine can be in [-1,1])
     scores = np.clip(scores, 0.0, 1.0)
 
-    order = np.argsort(-scores)[:top_k]
-    return [(index[i], float(scores[i])) for i in order]
+    order = np.argsort(-scores)
+    if not unique:
+        order = order[:top_k]
+        return [(index[i], float(scores[i])) for i in order]
+
+    # One result per asset: for videos keep the best-scoring section only
+    best_per_asset: dict[str, tuple[float, str]] = {}
+    for i in order:
+        entry = index[i]
+        key = _asset_key(entry)
+        sc = float(scores[i])
+        if key not in best_per_asset or sc > best_per_asset[key][0]:
+            best_per_asset[key] = (sc, entry)
+    # Sort by score descending and return top_k
+    results = sorted(best_per_asset.values(), key=lambda x: -x[0])[:top_k]
+    return [(entry, sc) for sc, entry in results]
 
 
 def main() -> int:
@@ -107,6 +125,12 @@ def main() -> int:
     parser.add_argument("query", help="What to search for (e.g. 'food', 'person skating')")
     parser.add_argument("-k", type=int, default=5, help="Number of results (default: 5)")
     parser.add_argument(
+        "--all-sections",
+        action="store_true",
+        dest="all_sections",
+        help="Show all matching sections (default: one result per asset, best timestamp per video).",
+    )
+    parser.add_argument(
         "--raw",
         action="store_true",
         help="Use query as-is instead of wrapping as 'This is a photo of <query>.'",
@@ -114,7 +138,7 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        results = search(args.query, top_k=args.k, raw_query=args.raw)
+        results = search(args.query, top_k=args.k, raw_query=args.raw, unique=not args.all_sections)
     except FileNotFoundError as e:
         print(e, file=sys.stderr)
         return 1
