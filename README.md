@@ -1,130 +1,119 @@
-# Videre (Electron Local Desktop)
+# Videre
 
-Videre is an Electron desktop video editor running fully local without
-auth/cloud dependencies.
+Videre is a fully local Electron-based desktop video editor. It is designed to run completely offline without any cloud dependencies or authentication requirements, ensuring your media and projects remain private on your local machine.
 
-## What Changed
+Videre leverages advanced local AI integrations to provide intelligent features like automated transcription and transcript analysis using on-device NPUs (Neural Processing Units).
 
-- Tauri runtime removed.
-- Frontend moved to a React Router app (`/app`).
-- Authentication removed (local single-user mode).
-- Project persistence moved to local filesystem JSON storage.
-- Media upload/render is local-only via the bundled Remotion/Express server.
+---
 
-## Local Data Paths
+## 🏗️ Architecture Overview
 
-- Projects index: `local_data/projects.json`
-- Project state files: `local_data/project_state/<project-id>.json`
-- Imported media: `out/<project-id>/`
-- Rendered outputs: `out/`
+The application consists of three main pillars:
+1. **Frontend (App/UI)**: Built with React Router (`/app`). Handles the user interface, video timeline editing, and media management.
+2. **Backend (Render & API Server)**: A Node.js Express server (`/app/videorender/videorender.ts`) powered by Remotion. It serves media, builds projects, handles file uploads, and spawns AI Python scripts.
+3. **Desktop Wrapper**: Electron wrapper (`/electron/main.cjs`) that launches the backend server and frontend in a native application window.
 
-You can override paths with:
+---
 
-- `VIDERE_DATA_DIR`
-- `VIDERE_MEDIA_DIR`
-- `TIMELINE_DIR`
-
-## Development
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js 20+
-- `pnpm`
-- `ffmpeg` available on your `PATH`
+Before running the application, ensure you have the following installed on your system:
+- **Node.js**: v20 or higher
+- **pnpm**: Fast, disk space efficient package manager (`npm install -g pnpm`)
+- **Python**: v3.10 or higher (Required for AI transcription and analysis)
+- **FFmpeg**: Must be installed and available in your system's `PATH`.
 
-### Start Desktop App
+### 1. Install Node Dependencies
+
+Clone the repository and install the standard JavaScript dependencies:
 
 ```bash
 pnpm install
+```
+
+### 2. Start the Development Environment
+
+To launch the complete application stack (Frontend, Backend, and Electron Desktop App), run:
+
+```bash
 pnpm desktop:dev
 ```
 
-This starts:
+This single command utilizes `concurrently` to start:
+- The React Router development server on `http://127.0.0.1:5173`
+- The Local Remotion render/upload API server on `http://127.0.0.1:8000`
+- The Electron window loading the application
 
-- React Router dev server on `http://127.0.0.1:5173`
-- Local render/upload server on `http://127.0.0.1:8000`
-- Electron window loading the app
+> **Troubleshooting PowerShell Errors (Windows)**:
+> If you encounter an error like *`pnpm.ps1 cannot be loaded because running scripts is disabled`*, you need to update your PowerShell execution policy. Run PowerShell as Administrator and execute:
+> ```powershell
+> Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+> ```
 
-Shortcut:
+---
 
-```bash
-./scripts/start-dev.sh
-```
+## 🧠 Local AI Setup (NPU & CPU)
 
-## Scripts
+Videre integrates on-device AI for transcribing video clips and analyzing transcripts. These require a Python virtual environment to run.
 
-- `pnpm dev` - React Router dev server
-- `pnpm render:server` - Remotion render/upload server
-- `pnpm desktop:dev` - Full desktop dev stack (web + render + Electron)
-- `pnpm build` - React Router production build
-- `pnpm preview` - Serve production build locally
-- `pnpm typecheck` - Type generation + TypeScript checks
-- `pnpm lint` - ESLint checks
+### Setup the Python Virtual Environment
 
-## Local Whisper Setup
+From the root of the repository, create a Python virtual environment named `.venv-whisper`. *It must be named exactly this for the backend to detect it automatically.*
 
-The Captions tab transcribes clips with a local Python runner. By default it
-uses **Whisper on the Snapdragon NPU** (`nexa-caption-lab` + `onnxruntime-qnn`).
-You can switch to the legacy **transformers** pipeline for testing via the
-"Use legacy Whisper (transformers) for testing" option in the Captions panel.
-
-### Default: NPU (Whisper on Snapdragon NPU)
-
-From the repo root, create a venv (Python 3.10+) and install the NPU backend:
-
-**Windows (PowerShell or cmd):**
-
+**Windows (PowerShell/CMD):**
 ```powershell
 py -m venv .venv-whisper
 .venv-whisper\Scripts\activate
+# Install NPU-accelerated transcription lab dependencies
 pip install -e ./nexa-caption-lab[npu]
 ```
 
 **macOS / Linux:**
-
 ```bash
-python3.12 -m venv .venv-whisper
+python3 -m venv .venv-whisper
 source .venv-whisper/bin/activate
 pip install -e ./nexa-caption-lab[npu]
 ```
 
-This installs `onnxruntime-qnn` and `transformers`. The app will use
-`.venv-whisper\Scripts\python.exe` (Windows) or `.venv-whisper/bin/python`
-(Unix) automatically. NPU models go under `nexa-caption-lab/models/` and are
-downloaded on first use.
+### 1. Whisper NPU Transcription
+The "Captions" tab allows you to transcribe audio from video clips. By default, it uses **Whisper on the Snapdragon NPU** (via `onnxruntime-qnn`). The first run will automatically download the required NPU model weights into `nexa-caption-lab/models/`.
 
-### Optional: Legacy Whisper (transformers, for testing)
+*Legacy CPU/GPU testing option*: If you don't have an NPU, you can optionally install standard PyTorch/Transformers into the same virtual environment using `pip install -r app/videorender/requirements-whisper.txt`, and toggle "Use legacy Whisper" in the UI.
 
-To use the legacy script (`whisper_transcribe.py`) with torch + transformers,
-install in the same venv:
+### 2. Llama 3.2 3B Instruct Transcript Analysis
+After transcribing a clip, you can click **Analyze** in the UI to use the Llama 3.2 3B Instruct model (via Qualcomm AI Hub tools). The local LLM will detect filler words ("umms", "uhhs"), retakes, and suggest structural cuts with frame-accurate timestamps. This uses `qai-hub-models` within your Python environment.
 
-```bash
-pip install -r app/videorender/requirements-whisper.txt
-```
+---
 
-Then enable "Use legacy Whisper (transformers) for testing" in the Captions
-tab when running transcription.
+## 📁 Local Data Management
 
-### Environment Overrides
+All data remains stored locally. You can find your saved files and media in the root directories created during runtime:
 
-- `VIDERE_WHISPER_PYTHON` – Python interpreter (auto-detects `.venv-whisper`, `.venv`, then system).
-- `VIDERE_WHISPER_MODEL` – Model name (legacy only; default: `openai/whisper-small`).
-- `VIDERE_WHISPER_DEVICE` – Device for legacy (default: `auto`).
-- `VIDERE_WHISPER_FFMPEG_BIN` – ffmpeg binary (default: `ffmpeg`).
-- `VIDERE_NPU_MODELS_DIR` – Override NPU model root (default: `nexa-caption-lab/models`).
+- **Projects Index**: `local_data/projects.json`
+- **Project State Files**: `local_data/project_state/<project-id>.json`
+- **Imported Media Files**: `out/<project-id>/`
+- **Rendered Outputs**: `out/`
 
-### First Run Behavior
+*Note: You can override these paths by setting the environment variables `VIDERE_DATA_DIR`, `VIDERE_MEDIA_DIR`, or `TIMELINE_DIR`.*
 
-The first transcription may download model weights (NPU or Hugging Face) and
-take longer than subsequent runs.
+---
 
-## Notes
+## 🛠️ Available Scripts
 
-- No login/session setup is required.
-- Storage/account views now report local disk usage.
-- All imported videos/images/audio remain on local disk.
+Here are the granular `pnpm` scripts available in `package.json` if you wish to run components individually:
 
-## Python Labs (unchanged)
+- `pnpm dev` - Starts only the React Router frontend dev server.
+- `pnpm render:server` - Starts only the backend Express/Remotion API server.
+- `pnpm desktop:dev` - Starts the full local desktop stack (Web + Server + Electron).
+- `pnpm build` - Creates a production build of the React Router application.
+- `pnpm preview` - Serves the production build locally.
+- `pnpm typecheck` - Performs TypeScript type-checking.
+- `pnpm lint` - Runs ESLint across the codebase.
 
-- `nexa-caption-lab/`
-- `nexa-video-context-lab/`
+## 🧪 Additional Python Labs
+
+This repository also contains standalone research labs for video context analysis. These do not natively run in the Electron UI but can be executed via CLI:
+- `nexa-video-context-lab/`: Scripts for building scene context, finding timestamp matches via VLMs, and exporting segments.
+- `nexa-caption-lab/`: The core library interfacing with Whisper for NPU optimizations.

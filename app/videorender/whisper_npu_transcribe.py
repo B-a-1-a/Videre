@@ -165,16 +165,26 @@ def main() -> int:
 
             full_text = result.get("text") or ""
             segments = result.get("segments") or []
-            # Map segments to "words" format (same as legacy): each segment = one word/phrase with start/end in clip time
-            words = [
-                {
-                    "text": seg.get("text", "").strip(),
-                    "start": start_sec + to_float(seg.get("start"), 0.0),
-                    "end": start_sec + to_float(seg.get("end"), 0.0),
-                }
-                for seg in segments
-                if seg.get("text", "").strip()
-            ]
+            # Map segments to "words" format by quantizing words per second
+            words = []
+            for seg in segments:
+                seg_text = seg.get("text", "").strip()
+                if not seg_text:
+                    continue
+                seg_start = start_sec + to_float(seg.get("start"), 0.0)
+                seg_end = start_sec + to_float(seg.get("end"), 0.0)
+                
+                seg_words = seg_text.split()
+                if not seg_words:
+                    continue
+                
+                word_duration = (seg_end - seg_start) / len(seg_words)
+                for i, w in enumerate(seg_words):
+                    words.append({
+                        "text": w,
+                        "start": seg_start + (i * word_duration),
+                        "end": seg_start + ((i + 1) * word_duration),
+                    })
             if not full_text and words:
                 full_text = " ".join(w["text"] for w in words).strip()
 
