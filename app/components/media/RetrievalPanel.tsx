@@ -191,7 +191,21 @@ export function RetrievalPanel({ clipTranscripts }: RetrievalPanelProps) {
                                 return (
                                     <div
                                         key={idx}
-                                        className="group relative rounded-lg overflow-hidden border border-border/50 bg-card hover:border-primary/40 transition-colors"
+                                        className="group relative rounded-lg overflow-hidden border border-border/50 bg-card hover:border-primary/40 transition-colors cursor-grab active:cursor-grabbing"
+                                        draggable
+                                        onDragStart={(e) => {
+                                            const item = {
+                                                id: `retrieved-${Date.now()}-${idx}`,
+                                                name: displayName,
+                                                mediaType: isVideo ? "video" : "image",
+                                                mediaUrlLocal: baseUrl,
+                                                mediaUrlRemote: baseUrl,
+                                                durationInSeconds: 5, // default duration
+                                                media_width: 1920,
+                                                media_height: 1080,
+                                            };
+                                            e.dataTransfer.setData("application/json", JSON.stringify(item));
+                                        }}
                                     >
                                         {isVideo ? (
                                             <video

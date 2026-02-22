@@ -49,6 +49,7 @@ import {
   type Transition,
 } from "~/components/timeline/types";
 import { useNavigate, useParams } from "react-router";
+import { generateUUID } from "~/utils/uuid";
 import { RetrievalPanel } from "~/components/media/RetrievalPanel";
 import { VidereLogo } from "~/components/ui/VidereLogo";
 import { useAuth } from "~/hooks/useAuth";
@@ -1363,7 +1364,9 @@ export default function TimelineEditor() {
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={25} minSize={18} maxSize={40}>
           <div className="h-full border-l border-border flex flex-col">
-            <RetrievalPanel clipTranscripts={clipTranscripts} />
+            <RetrievalPanel
+              clipTranscripts={clipTranscripts}
+            />
             <div className="p-3 border-t border-border bg-background mt-auto">
               <Button
                 variant="default"

@@ -381,6 +381,7 @@ function runWhisperTranscription(
     const pythonBin = resolveWhisperPython(useLegacyWhisper);
     const runner = spawn(pythonBin, [scriptPath], {
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1' },
     });
 
     let stdout = '';
