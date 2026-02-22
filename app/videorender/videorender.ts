@@ -684,6 +684,109 @@ app.delete('/media/:filename', (req: Request, res: Response): void => {
   }
 });
 
+app.post('/analyze-transcript', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const body = req.body as Record<string, unknown> | undefined;
+    if (!body || typeof body !== 'object') {
+      res.status(400).json({ error: 'Invalid request body.' });
+      return;
+    }
+
+    const scrubberId = toSingleString(body.scrubberId)?.trim();
+    if (!scrubberId) {
+      res.status(400).json({ error: 'Missing scrubberId.' });
+      return;
+    }
+
+    const text = toSingleString(body.text)?.trim() || '';
+    const words = Array.isArray(body.words) ? body.words : [];
+
+    if (!text || words.length === 0) {
+      res.status(400).json({ error: 'Missing text or words for analysis.' });
+      return;
+    }
+
+    const scriptPath = path.resolve('./app/videorender/llama_npu_analyze.py');
+    if (!fs.existsSync(scriptPath)) {
+      res.status(500).json({ error: `Analyzer script not found at ${scriptPath}` });
+      return;
+    }
+    
+    // We try to find a system python for demonstration, might need proper venv resolution
+    // Using simple resolution or just 'python3'/'python' for now
+    let pythonBin = 'python';
+    if (process.platform !== 'win32') {
+        pythonBin = fs.existsSync('/opt/homebrew/bin/python3') ? '/opt/homebrew/bin/python3' : 'python3';
+    }
+
+    const runner = spawn(pythonBin, [scriptPath], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    runner.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf8');
+    });
+    runner.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+    });
+
+    runner.on('close', (code) => {
+      if (code !== 0) {
+        const detail = stderr.trim() || 'Unknown Python runner failure.';
+        res.status(500).json({ error: `LLM runner exited with code ${code}: ${detail}` });
+        return;
+      }
+
+      try {
+        const rawStdout = (stdout || '').trim();
+        const jsonLine =
+          rawStdout
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .reverse()
+            .find((line) => line.startsWith('{') && line.endsWith('}')) ||
+          rawStdout ||
+          '{}';
+        const parsed = JSON.parse(jsonLine);
+        
+        if (parsed.success === false) {
+           res.status(500).json({ error: parsed.error || 'LLM analysis failed.' });
+           return;
+        }
+
+        res.json({
+            success: true,
+            suggestions: parsed.suggestions || [],
+            scrubberId: parsed.scrubberId
+        });
+      } catch (error) {
+        res.status(500).json({ 
+          error: `Failed to parse LLM runner output: ${error instanceof Error ? error.message : String(error)}`
+        });
+      }
+    });
+    
+    runner.on('error', (error) => {
+      res.status(500).json({ error: `Failed to launch LLM runner: ${error.message}` });
+    });
+
+    const payload = JSON.stringify({
+      scrubberId,
+      text,
+      words
+    });
+    runner.stdin.write(payload);
+    runner.stdin.end();
+
+  } catch (error) {
+    console.error('Analyze error:', error);
+    res.status(500).json({ error: 'Failed to analyze transcript' });
+  }
+});
+
 app.post('/transcribe-clips', async (req: Request, res: Response): Promise<void> => {
   if (isTranscriptionRunning) {
     res.status(409).json({

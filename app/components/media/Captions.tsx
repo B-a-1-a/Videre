@@ -7,6 +7,7 @@ import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
 import { Switch } from "~/components/ui/switch";
 import { Label } from "~/components/ui/label";
+import { Modal } from "~/components/ui/modal";
 import type {
   ClipTranscriptRecord,
   ClipTranscriptsMap,
@@ -53,6 +54,14 @@ type TranscribeResponse = {
   results: TranscribeClipResponseItem[];
 };
 
+type AnalysisSuggestion = {
+  type: "filler" | "retake" | "cut";
+  description: string;
+  startSec: number;
+  endSec: number;
+};
+
+
 function findScrubber(timeline: TimelineState, scrubberId: string): ScrubberState | null {
   for (const track of timeline.tracks) {
     for (const scrubber of track.scrubbers) {
@@ -93,6 +102,9 @@ export default function Captions() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingIds, setPendingIds] = useState<string[]>([]);
   const [useLegacyWhisper, setUseLegacyWhisper] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResults, setAnalysisResults] = useState<{ scrubberId: string, suggestions: AnalysisSuggestion[] } | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const selectedScrubbers = useMemo(() => {
     return selectedScrubberIds
@@ -223,19 +235,19 @@ export default function Captions() {
 
             const words = Array.isArray(result.words)
               ? result.words
-                  .filter((word) => {
-                    return (
-                      typeof word.text === "string" &&
-                      word.text.trim().length > 0 &&
-                      Number.isFinite(word.start) &&
-                      Number.isFinite(word.end)
-                    );
-                  })
-                  .map((word) => ({
-                    text: word.text.trim(),
-                    start: Number(word.start),
-                    end: Number(word.end),
-                  }))
+                .filter((word) => {
+                  return (
+                    typeof word.text === "string" &&
+                    word.text.trim().length > 0 &&
+                    Number.isFinite(word.start) &&
+                    Number.isFinite(word.end)
+                  );
+                })
+                .map((word) => ({
+                  text: word.text.trim(),
+                  start: Number(word.start),
+                  end: Number(word.end),
+                }))
               : [];
 
             const mediaType = scrubber?.mediaType === "audio" ? "audio" : "video";
@@ -284,6 +296,46 @@ export default function Captions() {
     },
     [isSubmitting, onClipTranscriptsChange, projectId, timeline, useLegacyWhisper]
   );
+
+  const handleAnalyzeClips = useCallback(async (scrubberId: string) => {
+    const record = clipTranscripts[scrubberId];
+    if (!record || !record.text || record.words.length === 0) {
+      toast.error("Transcript is not ready for analysis.");
+      return;
+    }
+
+    if (isAnalyzing) {
+      toast.info("An analysis is already in progress.");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch(apiUrl("/analyze-transcript"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scrubberId,
+          text: record.text,
+          words: record.words,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Analysis request failed.");
+      }
+
+      const payload = await response.json();
+      setAnalysisResults({ scrubberId, suggestions: payload.suggestions || [] });
+      setIsModalOpen(true);
+      toast.success("Transcript analysis complete.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to analyze transcript.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [clipTranscripts, isAnalyzing]);
 
   const handleTranscribeSelected = useCallback(() => {
     void transcribeIds(selectedScrubberIds);
@@ -430,12 +482,25 @@ export default function Captions() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-medium truncate">{record.scrubberName}</p>
-                      <Badge
-                        variant={record.error ? "destructive" : "secondary"}
-                        className="h-4 px-1.5 text-[10px] font-mono"
-                      >
-                        {record.error ? "error" : "ok"}
-                      </Badge>
+                      <div className="flex" style={{ gap: '12px' }}>
+                        {!record.error && record.text && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-5 px-2 text-[10px]"
+                            disabled={isAnalyzing}
+                            onClick={() => handleAnalyzeClips(scrubberId)}
+                          >
+                            Analyze
+                          </Button>
+                        )}
+                        <Badge
+                          variant={record.error ? "destructive" : "secondary"}
+                          className="h-4 px-1.5 text-[10px] font-mono"
+                        >
+                          {record.error ? "error" : "ok"}
+                        </Badge>
+                      </div>
                     </div>
 
                     <p className="text-[10px] text-muted-foreground font-mono mt-1">
@@ -473,6 +538,27 @@ export default function Captions() {
           </>
         )}
       </div>
+
+      <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)} title="AI Suggestions">
+        {analysisResults?.suggestions && analysisResults.suggestions.length > 0 ? (
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            {analysisResults.suggestions.map((sug, i) => (
+              <div key={i} className="text-xs border border-border p-2 rounded">
+                <div className="flex justify-between items-center mb-1">
+                  <Badge variant="outline" className="text-[10px] font-mono uppercase bg-muted/50">{sug.type}</Badge>
+                  <span className="text-[10px] text-muted-foreground font-mono">[{sug.startSec.toFixed(2)}s - {sug.endSec.toFixed(2)}s]</span>
+                </div>
+                <p className="text-muted-foreground mt-1">{sug.description}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground py-4 text-center">No suggestions found.</p>
+        )}
+        <div className="mt-4 flex justify-end">
+          <Button size="sm" onClick={() => setIsModalOpen(false)}>Close</Button>
+        </div>
+      </Modal>
     </div>
   );
 }
