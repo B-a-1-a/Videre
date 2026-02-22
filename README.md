@@ -92,6 +92,55 @@ different interpreter path, set `VIDERE_WHISPER_PYTHON`.
 The first transcription request downloads the Whisper model weights and may
 take noticeably longer than subsequent runs.
 
+## Image embeddings (SigLIP2)
+
+Images in `assets/` can be encoded with **google/siglip2-base-patch16-224** for text-to-image retrieval.
+
+### Downloading the SigLIP2 model from Hugging Face
+
+The model is downloaded automatically the first time you run the build or retrieval script (via `transformers`’s `from_pretrained("google/siglip2-base-patch16-224")`). It is cached under your Hugging Face cache directory (e.g. `~/.cache/huggingface/hub/` on Linux/macOS, or `%USERPROFILE%\.cache\huggingface\hub\` on Windows).
+
+To **pre-download** the model into the default cache (e.g. while online) without running the scripts:
+
+```bash
+pip install huggingface_hub
+huggingface-cli download google/siglip2-base-patch16-224
+```
+
+The model is stored in the default Hugging Face cache, so the build and retrieval scripts will use it automatically. Otherwise, no separate download step is needed: run the build or retrieval script once with internet and the model is downloaded and cached for you.
+
+### Storing the embeddings
+
+With the virtual environment activated and dependencies installed, run the build script. It loads the model from the cache (or downloads it if missing), encodes every image in `assets/`, and writes the embeddings and index into the repo:
+
+```bash
+# Install dependencies (one-time)
+pip install torch "transformers>=4.49" pillow numpy
+
+# Encode all images in assets/ and store embeddings (run when you add or change images)
+python scripts/build_image_embeddings.py
+```
+
+This creates:
+
+| File | Description |
+|------|-------------|
+| `assets/embeddings/image_embeddings.npy` | Embedding matrix, shape `(N, D)` (N = number of images) |
+| `assets/embeddings/image_index.json` | List of image filenames in the same order as the rows |
+
+Commit these two files to the repo so retrieval can use them offline.
+
+### Retrieve by text
+
+Nearest-neighbour search over the stored embeddings:
+
+```bash
+python scripts/retrieve_by_text.py "a skateboard"
+python scripts/retrieve_by_text.py "random scenery" -k 3
+```
+
+Retrieval runs **fully offline** after the first run (model/tokenizer are loaded from the Hugging Face cache with `local_files_only=True`). Run build or retrieval once with internet to populate the cache, then it works without network.
+
 ## Notes
 
 - No login/session setup is required.
