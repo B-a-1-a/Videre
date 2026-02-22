@@ -6,11 +6,11 @@ import { apiUrl } from "~/utils/api"
 
 // Delete media file from server
 export const deleteMediaFile = async (
-  filename: string
+  storageKey: string
 ): Promise<{ success: boolean; message?: string; error?: string }> => {
   try {
     const response = await fetch(
-      apiUrl(`/media/${encodeURIComponent(filename)}`),
+      apiUrl(`/media/${encodeURIComponent(storageKey)}`),
       {
         method: "DELETE",
       }
@@ -33,7 +33,7 @@ export const deleteMediaFile = async (
 
 // Clone/copy media file on server
 export const cloneMediaFile = async (
-  filename: string,
+  storageKey: string,
   originalName: string,
   suffix: string
 ): Promise<{
@@ -52,7 +52,7 @@ export const cloneMediaFile = async (
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        filename,
+        filename: storageKey,
         originalName,
         suffix,
       }),
@@ -240,13 +240,17 @@ export const useMediaBin = (
     setIsMediaLoading(false);
   }, []);
 
-  const getFilenameFromMediaUrl = useCallback((mediaUrl: string | null): string | null => {
+  const getStorageKeyFromMediaUrl = useCallback((mediaUrl: string | null): string | null => {
     if (!mediaUrl) return null;
     try {
       const parsed = new URL(mediaUrl, window.location.origin);
       const parts = parsed.pathname.split("/").filter(Boolean);
-      const last = parts[parts.length - 1];
-      return last ? decodeURIComponent(last) : null;
+      const mediaIndex = parts.findIndex((part) => part === "media");
+      const keyParts = mediaIndex >= 0
+        ? parts.slice(mediaIndex + 1)
+        : parts.slice(parts.length - 1);
+      if (keyParts.length === 0) return null;
+      return keyParts.map((part) => decodeURIComponent(part)).join("/");
     } catch {
       return null;
     }
@@ -295,8 +299,11 @@ export const useMediaBin = (
       const formData = new FormData();
       formData.append('media', file);
 
+      const uploadEndpoint = projectId
+        ? `/upload?projectId=${encodeURIComponent(projectId)}`
+        : "/upload";
       console.log("Uploading file to server...");
-      const uploadResponse = await axios.post(apiUrl('/upload'), formData, {
+      const uploadResponse = await axios.post(apiUrl(uploadEndpoint), formData, {
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
             const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -340,7 +347,7 @@ export const useMediaBin = (
 
       throw new Error(`Failed to add media: ${errorMessage}`);
     }
-  }, []);
+  }, [projectId]);
 
   const handleAddTextToBin = useCallback((
     textContent: string,
@@ -413,12 +420,12 @@ export const useMediaBin = (
           return;
         }
       }
-      const filename = getFilenameFromMediaUrl(item.mediaUrlRemote);
-      if (!filename) {
+      const storageKey = getStorageKeyFromMediaUrl(item.mediaUrlRemote);
+      if (!storageKey) {
         console.error("Could not resolve media filename");
         return;
       }
-      const deleted = await deleteMediaFile(filename);
+      const deleted = await deleteMediaFile(storageKey);
       if (deleted.success) {
         console.log(`Media deleted: ${item.name}`);
         // Remove from media bin state
@@ -435,7 +442,7 @@ export const useMediaBin = (
     } catch (error) {
       console.error("Error deleting media:", error);
     }
-  }, [getFilenameFromMediaUrl, handleDeleteScrubbersByMediaBinId]);
+  }, [getStorageKeyFromMediaUrl, handleDeleteScrubbersByMediaBinId]);
 
   const handleSplitAudio = useCallback(async (videoItem: MediaBinItem) => {
     if (videoItem.mediaType !== "video") {
@@ -443,12 +450,12 @@ export const useMediaBin = (
     }
 
     try {
-      const filename = getFilenameFromMediaUrl(videoItem.mediaUrlRemote);
-      if (!filename) {
+      const storageKey = getStorageKeyFromMediaUrl(videoItem.mediaUrlRemote);
+      if (!storageKey) {
         throw new Error("No remote URL found for video item");
       }
       const cloneResult = await cloneMediaFile(
-        filename,
+        storageKey,
         videoItem.name,
         "audio"
       );
@@ -485,7 +492,7 @@ export const useMediaBin = (
       console.error("Error splitting audio:", error);
       throw error;
     }
-  }, [getFilenameFromMediaUrl]);
+  }, [getStorageKeyFromMediaUrl]);
 
   // Handle right-click to show context menu
   const handleContextMenu = useCallback(

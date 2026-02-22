@@ -20,6 +20,32 @@ export function ensureLocalStorageDirs(): void {
   }
 }
 
+export function getProjectMediaDir(projectId: string): string {
+  const sanitizedProjectId = sanitizeId(projectId);
+  const base = path.resolve(MEDIA_DIR);
+  const projectDir = path.resolve(base, sanitizedProjectId);
+  if (!projectDir.startsWith(base)) {
+    throw new Error("Invalid project media path");
+  }
+  return projectDir;
+}
+
+export function ensureProjectMediaDir(projectId: string): string {
+  ensureLocalStorageDirs();
+  const projectDir = getProjectMediaDir(projectId);
+  if (!fs.existsSync(projectDir)) {
+    fs.mkdirSync(projectDir, { recursive: true });
+  }
+  return projectDir;
+}
+
+export function removeProjectMediaDir(projectId: string): void {
+  const projectDir = getProjectMediaDir(projectId);
+  if (fs.existsSync(projectDir)) {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+}
+
 export function readJsonFile<T>(filePath: string, fallback: T): T {
   try {
     const raw = fs.readFileSync(filePath, "utf8");

@@ -15,7 +15,8 @@ auth/cloud dependencies.
 
 - Projects index: `local_data/projects.json`
 - Project state files: `local_data/project_state/<project-id>.json`
-- Imported media + rendered outputs: `out/`
+- Imported media: `out/<project-id>/`
+- Rendered outputs: `out/`
 
 You can override paths with:
 

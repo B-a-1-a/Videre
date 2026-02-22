@@ -9,6 +9,96 @@ import multer from 'multer';
 // The composition you want to render
 const compositionId = 'TimelineComposition';
 const OUT_DIR = path.resolve(process.env.VIDERE_MEDIA_DIR || 'out');
+const PROJECT_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+function ensureMediaRootDir(): void {
+  if (!fs.existsSync(OUT_DIR)) {
+    fs.mkdirSync(OUT_DIR, { recursive: true });
+  }
+}
+
+function toSingleString(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    return toSingleString(value[0]);
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return null;
+}
+
+function normalizeProjectId(value: unknown): string | null {
+  const raw = toSingleString(value)?.trim() ?? '';
+  if (!raw) return null;
+  if (!PROJECT_ID_PATTERN.test(raw)) return null;
+  return raw;
+}
+
+function getProjectIdFromRequest(req: Request): string | null {
+  const fromQuery = normalizeProjectId(req.query.projectId);
+  if (fromQuery) return fromQuery;
+
+  if (req.body && typeof req.body === 'object') {
+    const fromBody = normalizeProjectId(
+      (req.body as Record<string, unknown>).projectId
+    );
+    if (fromBody) return fromBody;
+  }
+  return null;
+}
+
+function ensureProjectMediaDir(projectId: string): string {
+  ensureMediaRootDir();
+  const projectDir = path.resolve(OUT_DIR, projectId);
+  if (!projectDir.startsWith(path.resolve(OUT_DIR))) {
+    throw new Error('Invalid project directory path');
+  }
+  if (!fs.existsSync(projectDir)) {
+    fs.mkdirSync(projectDir, { recursive: true });
+  }
+  return projectDir;
+}
+
+function normalizeStorageKeyToFsPath(storageKey: string): string {
+  const trimmed = String(storageKey || '').trim();
+  if (!trimmed) {
+    throw new Error('Invalid media storage key');
+  }
+  return trimmed
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => decodeURIComponent(segment))
+    .join(path.sep);
+}
+
+function resolveStoragePath(storageKey: string): string {
+  const filePath = path.resolve(OUT_DIR, normalizeStorageKeyToFsPath(storageKey));
+  if (!filePath.startsWith(path.resolve(OUT_DIR))) {
+    throw new Error('Access denied');
+  }
+  return filePath;
+}
+
+function getStorageKeyFromAbsolutePath(filePath: string): string {
+  const absolutePath = path.resolve(filePath);
+  const base = path.resolve(OUT_DIR);
+  if (!absolutePath.startsWith(base)) {
+    throw new Error('Access denied');
+  }
+  return path.relative(base, absolutePath).split(path.sep).join('/');
+}
+
+function toMediaUrl(storageKey: string): string {
+  const encodedKey = storageKey
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+  return `/media/${encodedKey}`;
+}
 
 // You only have to create a bundle once, and you may reuse it
 // for multiple renders that you can parametrize using input props.
@@ -21,9 +111,7 @@ const bundleLocation = await bundle({
 console.log(bundleLocation);
 
 // Ensure output directory exists
-if (!fs.existsSync(OUT_DIR)) {
-  fs.mkdirSync(OUT_DIR, { recursive: true });
-}
+ensureMediaRootDir();
 
 const app = express();
 app.use(express.json());
@@ -37,14 +125,20 @@ app.use('/media', express.static(OUT_DIR, {
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // Ensure out directory exists
-    if (!fs.existsSync(OUT_DIR)) {
-      fs.mkdirSync(OUT_DIR, { recursive: true });
+  destination: (req, _file, cb) => {
+    try {
+      const projectId = getProjectIdFromRequest(req);
+      if (projectId) {
+        cb(null, ensureProjectMediaDir(projectId));
+        return;
+      }
+      ensureMediaRootDir();
+      cb(null, OUT_DIR);
+    } catch (error) {
+      cb(error as Error, OUT_DIR);
     }
-    cb(null, OUT_DIR);
   },
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
     // Generate unique filename with timestamp
     const timestamp = Date.now();
     const originalName = file.originalname;
@@ -74,18 +168,21 @@ const upload = multer({
 // List files in out/ directory
 app.get('/media', (req: Request, res: Response): void => {
   try {
-    const outDir = OUT_DIR;
-    if (!fs.existsSync(outDir)) {
+    const projectId = normalizeProjectId(req.query.projectId);
+    const listDir = projectId ? path.resolve(OUT_DIR, projectId) : OUT_DIR;
+    if (!fs.existsSync(listDir)) {
       res.json({ files: [] });
       return;
     }
 
-    const files = fs.readdirSync(outDir).map(filename => {
-      const filePath = path.join(outDir, filename);
+    const files = fs.readdirSync(listDir).map(filename => {
+      const filePath = path.join(listDir, filename);
       const stats = fs.statSync(filePath);
+      const storageKey = projectId ? `${projectId}/${filename}` : filename;
       return {
         name: filename,
-        url: `/media/${encodeURIComponent(filename)}`,
+        storageKey,
+        url: toMediaUrl(storageKey),
         size: stats.size,
         modified: stats.mtime,
         isDirectory: stats.isDirectory()
@@ -107,14 +204,16 @@ app.post('/upload', upload.single('media'), (req: Request, res: Response): void 
       return;
     }
 
-    const fileUrl = `/media/${encodeURIComponent(req.file.filename)}`;
+    const storageKey = getStorageKeyFromAbsolutePath(req.file.path);
+    const fileUrl = toMediaUrl(storageKey);
     const fullUrl = `http://localhost:${port}${fileUrl}`; // Direct backend URL for Remotion
 
-    console.log(`📁 File uploaded: ${req.file.originalname} -> ${req.file.filename}`);
+    console.log(`📁 File uploaded: ${req.file.originalname} -> ${storageKey}`);
 
     res.json({
       success: true,
-      filename: req.file.filename,
+      filename: storageKey,
+      storageKey,
       originalName: req.file.originalname,
       url: fileUrl,
       fullUrl: fullUrl,
@@ -135,14 +234,19 @@ app.post('/upload-multiple', upload.array('media', 10), (req: Request, res: Resp
       return;
     }
 
-    const uploadedFiles = (req.files as Express.Multer.File[]).map(file => ({
-      filename: file.filename,
-      originalName: file.originalname,
-      url: `/media/${encodeURIComponent(file.filename)}`,
-      fullUrl: `http://localhost:${port}/media/${encodeURIComponent(file.filename)}`, // Direct backend URL for Remotion
-      size: file.size,
-      path: file.path
-    }));
+    const uploadedFiles = (req.files as Express.Multer.File[]).map(file => {
+      const storageKey = getStorageKeyFromAbsolutePath(file.path);
+      const fileUrl = toMediaUrl(storageKey);
+      return {
+        filename: storageKey,
+        storageKey,
+        originalName: file.originalname,
+        url: fileUrl,
+        fullUrl: `http://localhost:${port}${fileUrl}`, // Direct backend URL for Remotion
+        size: file.size,
+        path: file.path
+      };
+    });
 
     console.log(`📁 ${uploadedFiles.length} files uploaded`);
 
@@ -166,14 +270,8 @@ app.post('/clone-media', (req: Request, res: Response): void => {
       return;
     }
     
-    const decodedFilename = decodeURIComponent(filename);
-    const sourcePath = path.resolve(OUT_DIR, decodedFilename);
-    
-    // Security check - ensure source file is in the out directory
-    if (!sourcePath.startsWith(OUT_DIR)) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
-    }
+    const sourceStorageKey = String(filename);
+    const sourcePath = resolveStoragePath(sourceStorageKey);
     
     if (!fs.existsSync(sourcePath)) {
       res.status(404).json({ error: 'Source file not found' });
@@ -182,24 +280,31 @@ app.post('/clone-media', (req: Request, res: Response): void => {
     
     // Generate new filename with timestamp and suffix
     const timestamp = Date.now();
-    const sourceExtension = path.extname(decodedFilename);
-    const sourceNameWithoutExt = path.basename(decodedFilename, sourceExtension);
-    const newFilename = `${sourceNameWithoutExt}_${suffix}_${timestamp}${sourceExtension}`;
-    const destPath = path.resolve(OUT_DIR, newFilename);
+    const safeSuffix = String(suffix || 'copy').replace(/[^a-zA-Z0-9_-]/g, '') || 'copy';
+    const sourceExtension = path.extname(sourcePath);
+    const sourceNameWithoutExt = path.basename(sourcePath, sourceExtension);
+    const newFilename = `${sourceNameWithoutExt}_${safeSuffix}_${timestamp}${sourceExtension}`;
+    const destPath = path.resolve(path.dirname(sourcePath), newFilename);
+    if (!destPath.startsWith(path.resolve(OUT_DIR))) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
     
     // Copy the file
     fs.copyFileSync(sourcePath, destPath);
     
     const fileStats = fs.statSync(destPath);
-    const fileUrl = `/media/${encodeURIComponent(newFilename)}`;
+    const clonedStorageKey = getStorageKeyFromAbsolutePath(destPath);
+    const fileUrl = toMediaUrl(clonedStorageKey);
     const fullUrl = `http://localhost:${port}${fileUrl}`;
     
-    console.log(`📋 File cloned: ${decodedFilename} -> ${newFilename}`);
+    console.log(`📋 File cloned: ${sourceStorageKey} -> ${clonedStorageKey}`);
     
     res.json({
       success: true,
-      filename: newFilename,
-      originalName: originalName || decodedFilename,
+      filename: clonedStorageKey,
+      storageKey: clonedStorageKey,
+      originalName: originalName || path.basename(sourceStorageKey),
       url: fileUrl,
       fullUrl: fullUrl,
       size: fileStats.size,
@@ -220,14 +325,8 @@ app.delete('/media/:filename', (req: Request, res: Response): void => {
       res.status(400).json({ error: 'Filename is required' });
       return;
     }
-    const filename = decodeURIComponent(rawFilename);
-    const filePath = path.resolve(OUT_DIR, filename);
-    
-    // Security check - ensure file is in the out directory
-    if (!filePath.startsWith(OUT_DIR)) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
-    }
+    const filename = String(rawFilename);
+    const filePath = resolveStoragePath(filename);
     
     if (!fs.existsSync(filePath)) {
       res.status(404).json({ error: 'File not found' });

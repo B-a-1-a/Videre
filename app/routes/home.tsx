@@ -5,6 +5,7 @@ import {
   Pause,
   Upload,
   Download,
+  FileImage,
   Settings,
   Plus,
   Minus,
@@ -47,7 +48,7 @@ import {
   type TrackState,
   type ScrubberState,
 } from "~/components/timeline/types";
-import { useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { ChatBox } from "~/components/chat/ChatBox";
 import { VidereLogo } from "~/components/ui/VidereLogo";
 import { useAuth } from "~/hooks/useAuth";
@@ -797,6 +798,24 @@ export default function TimelineEditor() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          asChild
+                          className="h-6 px-2 text-xs"
+                          title="Open Media"
+                        >
+                          <Link
+                            to={
+                              projectId
+                                ? `/project/${encodeURIComponent(projectId)}/media-bin`
+                                : "/projects"
+                            }
+                          >
+                            <FileImage className="h-3 w-3 mr-1" />
+                            Media
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => setIsChatMinimized(false)}
                           className="h-6 w-6 p-0 text-primary"
                           title="Open Chat">
@@ -973,18 +992,34 @@ export default function TimelineEditor() {
           <>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={20} minSize={15} maxSize={35}>
-              <div className="h-full border-l border-border">
-                <ChatBox
-                  mediaBinItems={mediaBinItems}
-                  handleDropOnTrack={handleDropOnTrack}
-                  isMinimized={false}
-                  onToggleMinimize={() => setIsChatMinimized(true)}
-                  messages={chatMessages}
-                  onMessagesChange={setChatMessages}
-                  timelineState={timeline}
-                  handleUpdateScrubber={handleUpdateScrubberWithLocking}
-                  handleDeleteScrubber={handleDeleteScrubber}
-                />
+              <div className="h-full border-l border-border flex flex-col">
+                <div className="flex-1 min-h-0">
+                  <ChatBox
+                    mediaBinItems={mediaBinItems}
+                    handleDropOnTrack={handleDropOnTrack}
+                    isMinimized={false}
+                    onToggleMinimize={() => setIsChatMinimized(true)}
+                    messages={chatMessages}
+                    onMessagesChange={setChatMessages}
+                    timelineState={timeline}
+                    handleUpdateScrubber={handleUpdateScrubberWithLocking}
+                    handleDeleteScrubber={handleDeleteScrubber}
+                  />
+                </div>
+                <div className="h-10 border-t border-border/60 bg-background/95 px-2 flex items-center justify-end">
+                  <Button variant="ghost" size="sm" asChild className="h-7 px-2 text-xs">
+                    <Link
+                      to={
+                        projectId
+                          ? `/project/${encodeURIComponent(projectId)}/media-bin`
+                          : "/projects"
+                      }
+                    >
+                      <FileImage className="h-3.5 w-3.5 mr-1" />
+                      Media
+                    </Link>
+                  </Button>
+                </div>
               </div>
             </ResizablePanel>
           </>

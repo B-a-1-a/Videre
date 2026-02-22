@@ -2,10 +2,12 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import {
+  ensureProjectMediaDir,
   ensureLocalStorageDirs,
   PROJECT_STATE_DIR,
   PROJECTS_FILE,
   readJsonFile,
+  removeProjectMediaDir,
   sanitizeId,
   writeJsonFile,
 } from "~/lib/local-storage";
@@ -46,6 +48,7 @@ export async function createProject(params: {
     created_at: now,
     updated_at: now,
   };
+  ensureProjectMediaDir(next.id);
   const projects = loadProjects();
   projects.push(next);
   saveProjects(projects);
@@ -108,6 +111,11 @@ export async function deleteProjectById(
     fs.unlinkSync(stateFile);
   } catch {
     // ignore missing file
+  }
+  try {
+    removeProjectMediaDir(projectId);
+  } catch {
+    // ignore filesystem cleanup failures
   }
   return true;
 }

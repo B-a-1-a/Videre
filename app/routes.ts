@@ -9,6 +9,7 @@ export default [
     route("text-editor", "components/media/TextEditor.tsx"),
     route("media-bin", "components/timeline/MediaBinPage.tsx"),
     route("transitions", "components/media/Transitions.tsx"),
+    route("captions", "components/media/Captions.tsx"),
   ]),
   route("/api/projects/*", "routes/api.projects.$.tsx"),
   route("/api/storage/*", "routes/api.storage.$.tsx"),

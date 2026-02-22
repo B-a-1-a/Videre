@@ -45,6 +45,7 @@ export default function LeftPanel({
     if (location.pathname.includes("/media-bin")) return "media-bin";
     if (location.pathname.includes("/text-editor")) return "text-editor";
     if (location.pathname.includes("/transitions")) return "transitions";
+    if (location.pathname.includes("/captions")) return "captions";
     return "media-bin"; // default
   };
 
@@ -53,18 +54,27 @@ export default function LeftPanel({
   return (
     <div className="h-full flex flex-col bg-background">
       <Tabs value={activeTab} className="h-full flex flex-col">
-        {/* Tab Headers */}
-        <div className="border-b border-border bg-muted/30">
+        {/* Tab Content */}
+        <div className="flex-1 overflow-hidden">
+          <Outlet
+            context={{
+              // MediaBin props
+              mediaBinItems,
+              isMediaLoading,
+              onAddMedia,
+              onAddText,
+              contextMenu,
+              handleContextMenu,
+              handleDeleteFromContext,
+              handleSplitAudioFromContext,
+              handleCloseContextMenu,
+            }}
+          />
+        </div>
+
+        {/* Tab Headers (bottom dock) */}
+        <div className="border-t border-border bg-muted/30">
           <TabsList className="grid w-full grid-cols-3 h-9 bg-transparent p-0">
-            <TabsTrigger
-              value="media-bin"
-              asChild
-              className="h-8 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
-            >
-              <Link to="media-bin" className="flex items-center gap-1.5">
-                <FileImage className="h-3 w-3" />
-              </Link>
-            </TabsTrigger>
             <TabsTrigger
               value="text-editor"
               asChild
@@ -83,25 +93,26 @@ export default function LeftPanel({
                 <BetweenVerticalEnd className="h-3 w-3" />
               </Link>
             </TabsTrigger>
+            <TabsTrigger
+              value="captions"
+              asChild
+              className="h-8 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              <Link to="captions" className="flex items-center gap-1.5 text-[10px] font-semibold">
+                CC
+              </Link>
+            </TabsTrigger>
+            {/* Hidden trigger keeps media route valid for Tabs value without showing it in left dock */}
+            <TabsTrigger
+              value="media-bin"
+              asChild
+              className="hidden h-8 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              <Link to="media-bin" className="flex items-center gap-1.5">
+                <FileImage className="h-3 w-3" />
+              </Link>
+            </TabsTrigger>
           </TabsList>
-        </div>
-
-        {/* Tab Content */}
-        <div className="flex-1 overflow-hidden">
-          <Outlet
-            context={{
-              // MediaBin props
-              mediaBinItems,
-              isMediaLoading,
-              onAddMedia,
-              onAddText,
-              contextMenu,
-              handleContextMenu,
-              handleDeleteFromContext,
-              handleSplitAudioFromContext,
-              handleCloseContextMenu,
-            }}
-          />
         </div>
       </Tabs>
     </div>
